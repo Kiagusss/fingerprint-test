@@ -15,7 +15,8 @@ use Illuminate\Support\Facades\Schema;
  * Catatan: bukan kolom `last_auth_method` yang diubah — kolom ini sudah
  * NULL-able sejak awal, jadi akun tanpa password tetap aman disimpan.
  *
- * Terisolasi di database `hello_test`. Jangan dijalankan ke schema produksi.
+ * Terisolasi di database aplikasi ini (`login_heloklin` di produksi). Jangan
+ * dijalankan ke schema aplikasi lain di server yang sama.
  */
 return new class extends Migration
 {
