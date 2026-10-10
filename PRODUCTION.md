@@ -168,7 +168,16 @@ deploy/deploy.sh
 Skrip tersebut menjalankan: `git pull --ff-only` → `composer install --no-dev
 --optimize-autoloader` → `npm ci && npm run build` → `migrate --force` →
 perbaikan permission (`Heloklin:www`, 775 pada `storage` + `bootstrap/cache`,
-640 pada `.env`) → `php artisan optimize` → probe `/up` dan `/login` dari origin.
+640 pada `.env`) → `php artisan optimize` **sebagai user web `www`** lalu
+`chown -R www:www storage/framework/views` → probe `/up` dan `/login` dari origin.
+
+Langkah cache dijalankan sebagai `www` karena alasan berikut: setiap view yang
+lebih baru dari versi terkompilasinya membuat `BladeCompiler` memanggil
+`touch()` pada file terkompilasi, dan `touch()` dengan mtime eksplisit hanya
+boleh dilakukan pemilik file. Bila cache view dimiliki `Heloklin`, seluruh
+halaman yang memakai view stale akan 500 dengan pesan
+`touch(): Utime failed: Operation not permitted`. Jalankan juga `php artisan
+view:cache` sebagai `sudo -u www` bila meng-compile cache manual di server.
 
 Seeding akun/katalog kasus uji (idempoten, hanya bila memang diperlukan):
 
