@@ -83,6 +83,7 @@ CACHE_STORE=database          CACHE_PREFIX=login_heloklin
 QUEUE_CONNECTION=sync         LOG_LEVEL=warning
 PASSKEYS_USER_HANDLE_SECRET=<hex 64>   # merotasi nilai ini membatalkan semua passkey
 AUTH_ENABLE_PASSWORD_LOGIN=true        # MASA TRANSISI — lihat §4b
+APP_TIMEZONE=Asia/Jakarta              # jam yang ditulis & ditampilkan aplikasi
 BOOTSTRAP_KEY=                         # kosong = /bootstrap gagal-tertutup
 PASSKEY_BOOTSTRAP_NO_CONFIRM=false     # hanya berlaku bila APP_ENV=local
 ```
@@ -90,6 +91,37 @@ PASSKEY_BOOTSTRAP_NO_CONFIRM=false     # hanya berlaku bila APP_ENV=local
 `SESSION_DOMAIN=null` wajib: aplikasi lain di `*.heloklin.com` memakai nama
 cookie yang berbeda, dan cookie host-only mencegah sesi tercampur.
 `APP_NAME` menentukan nama cookie sesi (`heloklin-login-session`).
+
+### Zona waktu
+
+`APP_TIMEZONE=Asia/Jakarta` (dibaca `config/app.php`) menentukan jam yang dipakai
+aplikasi untuk menulis dan menampilkan waktu. Aplikasi ini pernah berjalan UTC,
+sehingga kejadian pukul 00:28 WIB tersimpan sebagai 17:28 dan riwayat di
+`/dashboard` terbaca 7 jam lebih awal.
+
+Mengubahnya menuntut DUA langkah, karena nilai yang sudah tersimpan adalah jam
+dinding UTC dan tidak ikut berubah sendiri:
+
+```bash
+bash /home/Heloklin/scripts/backup_login_db.sh   # snapshot dulu
+php scripts/shift_timezone.php                   # laporan saja
+php scripts/shift_timezone.php --apply           # geser +7 jam
+```
+
+Skrip itu menggeser setiap kolom `datetime`/`timestamp` yang terisi sebesar +7
+jam; di server ini sudah dijalankan sekali pada 11 Okt 2026 (322 nilai, 21 kolom,
+10 tabel). Sesudahnya jalankan `php artisan optimize` sebagai `www` dan muat
+ulang PHP-FPM supaya zona baru dipakai proses web:
+
+```bash
+sudo -u www php artisan optimize
+sudo /etc/init.d/php-fpm-84 reload      # unitnya tidak dikelola systemd di sini
+```
+
+Catatan: `php.ini` di server ini memakai zona default **UTC+8**, satu jam di
+depan WIB. Laravel mengesampingkannya lewat `APP_TIMEZONE`, jadi aplikasi tidak
+terpengaruh — tetapi skrip PHP di luar Laravel yang memakai `date()` harus
+menyetel zonanya sendiri (seperti `backup_login_db.sh` yang sudah melakukannya).
 
 `config/passkeys.php` menurunkan **RP ID** dan **allowed origin** dari `APP_URL`.
 Mengganti hostname berarti passkey lama tidak valid lagi.
