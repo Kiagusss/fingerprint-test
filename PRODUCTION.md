@@ -26,14 +26,19 @@ Kredensial (0600, hanya di server, tidak pernah di repo):
 
 ## 2. DNS & TLS
 
-DNS yang dibutuhkan di Cloudflare (zone `heloklin.com`):
+Record yang dipakai di Cloudflare (zone `heloklin.com`):
 
 ```
-A  login  139.190.99.175   Proxied (orange cloud)
+A  login  139.190.99.175   DNS only (grey cloud) saat ini
 ```
 
-TLS diterbitkan dengan acme.sh (Let's Encrypt, ECDSA P-256) memakai HTTP-01
-webroot ke docroot aplikasi:
+Blok `set_real_ip_from` + `real_ip_header CF-Connecting-IP` di vhost tetap
+terpasang, sehingga bila record nanti diubah menjadi **Proxied** (orange cloud),
+rate limit dan log audit langsung memakai IP pengunjung asli tanpa perubahan lain.
+Selama DNS-only, IP pengunjung sudah asli (tidak ada proxy di depan origin).
+
+Sertifikat TLS (terbit 10 Oktober 2026, berlaku sampai 8 Januari 2027) diterbitkan
+dengan acme.sh memakai HTTP-01 webroot ke docroot aplikasi:
 
 ```bash
 sudo /root/.acme.sh/acme.sh --issue --webroot \
@@ -46,12 +51,20 @@ sudo /root/.acme.sh/acme.sh --install-cert -d login.heloklin.com --ecc \
   --reloadcmd      "/etc/init.d/nginx reload"
 ```
 
-Perpanjangan otomatis sudah ditangani cron root
-(`/root/.acme.sh/acme.sh --cron`). Port 80 pada vhost hanya dipakai untuk
-verifikasi HTTP-01 dan untuk mengalihkan akses langsung ke origin (bypass
-Cloudflare) ke https; permintaan yang datang dari edge Cloudflare diteruskan
-apa adanya supaya tidak terjadi redirect loop bila mode TLS Cloudflare masih
-`Flexible`.
+Perpanjangan otomatis ditangani cron root (`/root/.acme.sh/acme.sh --cron`) dan
+hook `--reloadcmd` di atas. Port 80 pada vhost hanya dipakai untuk verifikasi
+HTTP-01 dan untuk mengalihkan akses langsung ke origin (bypass Cloudflare) ke
+https:
+
+```
+http://login.heloklin.com/  ->  301 https://login.heloklin.com/
+```
+
+Permintaan yang datang dari edge Cloudflare diteruskan apa adanya supaya tidak
+terjadi redirect loop bila mode TLS Cloudflare masih `Flexible`.
+
+HSTS hanya dikirim oleh aplikasi (`App\Http\Middleware\SecurityHeaders`); vhost
+sengaja tidak menambahkannya agar header tidak terkirim dua kali.
 
 ## 3. Konfigurasi aplikasi (`.env`)
 
@@ -102,18 +115,15 @@ luar `local/testing`, sehingga `TEST_ADMIN_PASSWORD` dan
 ## 5. Verifikasi setelah deploy
 
 ```bash
-# dari server (origin, TLS dibuat sendiri oleh nginx)
-curl -s -o /dev/null -w '%{http_code}\n' --resolve login.heloklin.com:443:127.0.0.1 https://login.heloklin.com/up
-curl -s -o /dev/null -w '%{http_code}\n' --resolve login.heloklin.com:443:127.0.0.1 https://login.heloklin.com/login
-
-# dari internet (lewat Cloudflare)
-curl -sI https://login.heloklin.com/ | head -3
+# dari server (loopback) atau lewat internet — hasilnya harus "all checks passed"
+deploy/verify.sh
+deploy/verify.sh https://login.heloklin.com
 ```
 
 Hasil yang diharapkan: `/up` 200, `/login` 200, tamu yang membuka `/dashboard`
 dialihkan ke `/login`, `/supervisor-test` sebagai `test-admin` menghasilkan 403,
-dan `GET /user/passkeys/options` dengan `Accept: application/json` menghasilkan
-423 (`password.confirm`).
+`GET /user/passkeys/options` dengan `Accept: application/json` menghasilkan 423
+(`password.confirm`), dan `http://` dialihkan 301 ke `https://`.
 
 ## 6. Papan "Hasil Pengujian" dan sinkronisasi otomatis
 
@@ -143,6 +153,7 @@ dua profil Windows nyata; jangan pernah menandainya PASS tanpa eksekusi.
 
 ## 8. Catatan & batasan yang diketahui
 
+- **Jangan ubah situs ini dari UI aaPanel** (tab Domain/SSL/Rewrite): panel akan menulis ulang vhost dan menimpa docroot `/public`, blok real-ip Cloudflare, dan pengalihan http→https. Terbitkan/perbarui sertifikat dengan cara acme.sh di §2. Folder `/www/wwwroot/login.heloklin.com` sendiri masih menampung file bawaan aaPanel (`index.html`, `404.html`, `.user.ini`) dan repo git kosong; semuanya berada di luar docroot sehingga tidak tersaji.
 - **OPcache tidak aktif** di PHP 8.4 pada server ini (`opcache.so` tersedia tetapi belum ada `zend_extension`). Mengaktifkannya adalah perubahan PHP global yang memengaruhi semua situs, jadi belum dilakukan.
 - **CSP belum dipasang** — view memakai `<script type="module">` inline sehingga perlu nonce.
 - `laravel/passkeys` masih `0.x`; ikat versi dan uji saat upgrade.
