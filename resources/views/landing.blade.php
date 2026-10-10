@@ -21,13 +21,15 @@
     <section class="card">
         <div class="card-header">
             <h2 class="card-title">Status Server</h2>
-            <span class="badge-info">{{ $server['app_env'] }}</span>
+            @auth
+                <span class="badge-info">{{ $server['app_env'] }}</span>
+            @endauth
         </div>
         <div class="card-body">
             <dl class="kv">
                 <dt>HTTPS terkonfigurasi</dt>
                 <dd><span class="{{ $badge($server['server_https']) }}">{{ $okText($server['server_https']) }}</span>
-                    <span class="mono-val ml-2">{{ $server['app_url'] }}</span></dd>
+                    <span class="mono-val ml-2">{{ $server['app_url'] ?? '' }}</span></dd>
 
                 <dt>Relying Party ID</dt>
                 <dd class="mono-val">{{ $server['rp_id'] ?? '—' }}</dd>
@@ -38,17 +40,23 @@
                 <dt>WebAuthn timeout</dt>
                 <dd class="mono-val">{{ $server['webauthn_timeout_ms'] ? $server['webauthn_timeout_ms'] . ' ms' : '—' }}</dd>
 
-                <dt>PHP / Laravel</dt>
-                <dd class="mono-val">{{ $server['php_version'] }} / {{ $server['laravel_version'] }}</dd>
+                @auth
+                    <dt>PHP / Laravel</dt>
+                    <dd class="mono-val">{{ $server['php_version'] }} / {{ $server['laravel_version'] }}</dd>
 
-                <dt>Debug mode</dt>
-                <dd>
-                    @if($server['debug'])
-                        <span class="badge-warn">AKTIF — jangan dipakai di server publik</span>
-                    @else
-                        <span class="badge-pass">Nonaktif</span>
-                    @endif
-                </dd>
+                    <dt>Debug mode</dt>
+                    <dd>
+                        @if($server['debug'])
+                            <span class="badge-warn">AKTIF — jangan dipakai di server publik</span>
+                        @else
+                            <span class="badge-pass">Nonaktif</span>
+                        @endif
+                    </dd>
+                @else
+                    <p class="mt-3 text-xs text-ink-400">
+                        Detail versi software, mode debug, dan konfigurasi sesi server hanya ditampilkan untuk pengguna yang sudah masuk.
+                    </p>
+                @endauth
             </dl>
         </div>
     </section>
@@ -119,6 +127,7 @@
     </section>
 
     {{-- Session cookie policy --}}
+    @auth
     <section class="card">
         <div class="card-header">
             <h2 class="card-title">Kebijakan Session Cookie</h2>
@@ -141,6 +150,7 @@
             </p>
         </div>
     </section>
+    @endauth
 </div>
 
 {{-- Mode explanation --}}

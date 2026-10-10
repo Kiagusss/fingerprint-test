@@ -95,6 +95,19 @@ Route::middleware('auth:web')->group(function () {
         });
     });
 
+    // The passkey package redirects here when a password.confirm-protected
+    // endpoint is opened as a full-page navigation instead of a fetch() call
+    // (fetch receives the documented 423 and re-verifies with a passkey). There
+    // is no password-confirmation page by design, so send the user back to the
+    // passkey screen instead of letting the framework bounce them to /login
+    // while they are in fact still authenticated.
+    Route::get('/password/confirm', function () {
+        return redirect()->route('passkeys.index')->with(
+            'status',
+            'Konfirmasi ulang diperlukan. Tekan "Tambah passkey" untuk memverifikasi dengan Windows Hello.',
+        );
+    })->name('password.confirm');
+
     // Role-gated demonstrator pages. The role is enforced from users.role by the
     // `role` middleware, never from anything the client supplies.
     Route::get('/admin-test', [RoleTestController::class, 'admin'])

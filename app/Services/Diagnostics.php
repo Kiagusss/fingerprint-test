@@ -45,6 +45,24 @@ class Diagnostics
         return str_starts_with($url, 'https://');
     }
 
+    /**
+     * Subset that is safe to render to an ANONYMOUS visitor on a public host:
+     * everything a tester needs to check the WebAuthn ceremony, and nothing
+     * about the software stack, debug state or session internals we are running.
+     * The full snapshot stays behind authentication.
+     *
+     * @return array<string, mixed>
+     */
+    public function publicSnapshot(): array
+    {
+        return array_intersect_key($this->snapshot(), array_flip([
+            'server_https',
+            'rp_id',
+            'allowed_origins',
+            'webauthn_timeout_ms',
+        ]));
+    }
+
     private function rpId(): ?string
     {
         try {

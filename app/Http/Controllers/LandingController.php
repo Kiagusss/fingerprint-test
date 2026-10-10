@@ -24,7 +24,7 @@ class LandingController extends Controller
         $user = $request->user();
 
         return view('landing', [
-            'server' => $this->diagnostics->snapshot(),
+            'server' => $user ? $this->diagnostics->snapshot() : $this->diagnostics->publicSnapshot(),
             'user' => $user,
             // The landing page shows the passkey count for the signed-in account.
             'passkeys' => $user?->passkeys()->latest()->get() ?? collect(),

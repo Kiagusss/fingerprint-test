@@ -1,2 +1,5 @@
+# login.heloklin.com is an internal verification portal for passkey
+# (Windows Hello / WebAuthn) login. Nothing here should be indexed.
 User-agent: *
-Disallow:
+Disallow: /
+
