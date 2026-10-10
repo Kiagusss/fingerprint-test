@@ -41,6 +41,7 @@ class TestLogger
         'bootstrap_passkey_enrolled',
         'biometric_device_created',
         'biometric_enrolled',
+        'biometric_identified',
         'biometric_enrollment_revoked',
     ];
 

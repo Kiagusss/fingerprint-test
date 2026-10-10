@@ -16,10 +16,11 @@ use Illuminate\Validation\ValidationException;
 /**
  * Endpoint untuk agen pemindai sidik jari (bukan browser).
  *
- * Tiga operasi, semuanya hanya melayani PENDAFTARAN jari. Tidak ada satu pun
- * jalur di sini yang membuat sesi login: identifikasi sidik jari dipakai untuk
- * memilih akun, sedangkan pembuktian identitas tetap password/passkey milik
- * karyawan itu. Itu sebabnya controller ini tidak menyentuh Auth.
+ * Empat operasi untuk agen: heartbeat, daftar pendaftaran, lapor pendaftaran, dan
+ * lapor hasil pencocokan. Tidak ada satu pun jalur di sini yang membuat sesi
+ * login: identifikasi sidik jari dipakai untuk memilih akun, sedangkan pembuktian
+ * identitas tetap password/passkey milik karyawan itu. Itu sebabnya controller
+ * ini tidak menyentuh Auth.
  *
  * Kepercayaan pada agen dibatasi: `secret` perangkat membuktikan "request ini
  * datang dari agen terdaftar", bukan bahwa agen jujur. Agen yang nakal hanya
@@ -179,6 +180,78 @@ class BiometricDeviceController
                 'template_ref' => $enrollment->template_ref,
                 'template_hash' => $enrollment->template_hash,
                 'quality' => $enrollment->quality,
+            ],
+        ], 201);
+    }
+
+    /**
+     * Mencatat satu hasil pencocokan jari dari agen.
+     *
+     * Ini MURNI catatan audit, dan itu batas yang dijaga ketat: tidak ada sesi,
+     * token, maupun cookie yang dibuat di sini. Agen mengabarkan siapa yang
+     * cocok, server memverifikasi klaim itu terhadap pendaftaran aktif miliknya
+     * sendiri (template_ref harus dikenal), lalu mencatatnya. Yang menentukan
+     * identitas karyawan tetap password/passkey miliknya di /login.
+     *
+     * Percobaan yang GAGAL cocok juga dicatat: percobaan jari yang tidak dikenal
+     * adalah peristiwa yang perlu terlihat, bukan yang perlu disembunyikan.
+     */
+    public function storeIdentification(Request $request): JsonResponse
+    {
+        $device = $this->device($request);
+
+        $data = $request->validate([
+            'matched' => ['required', 'boolean'],
+            'template_ref' => ['nullable', 'string', 'max:191', 'required_if:matched,true'],
+            'quality' => ['nullable', 'integer', 'between:0,100'],
+        ]);
+
+        $enrollment = null;
+
+        if ($data['matched']) {
+            // Klaim "cocok" tidak dipercaya begitu saja: template_ref harus
+            // menunjuk pendaftaran yang masih aktif.
+            $enrollment = BiometricEnrollment::query()
+                ->active()
+                ->where('template_ref', $data['template_ref'])
+                ->first();
+
+            if (! $enrollment instanceof BiometricEnrollment) {
+                throw ValidationException::withMessages([
+                    'template_ref' => 'Tidak ada pendaftaran aktif dengan template_ref itu.',
+                ]);
+            }
+        }
+
+        $user = $enrollment?->user;
+
+        $this->logger->log('biometric_identified', [
+            'request' => $request,
+            'user' => $user,
+            'auth_method' => 'fingerprint',
+            'role' => $user?->role?->value,
+            'credential_id' => $enrollment?->template_ref,
+            'meta' => [
+                'device_uuid' => $device->uuid,
+                'device_name' => $device->name,
+                'matched' => (bool) $data['matched'],
+                'finger' => $enrollment?->finger,
+                'quality' => $data['quality'] ?? 0,
+                'enrollment_id' => $enrollment?->id,
+                // false = jari itu didaftarkan di PC lain; layak diperhatikan.
+                'is_local' => $enrollment?->source_device_id === $device->id,
+            ],
+        ]);
+
+        return response()->json([
+            'identification' => [
+                'matched' => (bool) $data['matched'],
+                'user_id' => $user?->getKey(),
+                'username' => $user?->username,
+                'display_name' => $user?->name,
+                'finger' => $enrollment?->finger,
+                'template_ref' => $enrollment?->template_ref,
+                'logged_at' => now()->toIso8601String(),
             ],
         ], 201);
     }

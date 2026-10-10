@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\Role;
 use App\Models\BiometricDevice;
 use App\Models\BiometricEnrollment;
 use App\Models\User;
@@ -133,7 +134,7 @@ class BiometricEnrollmentTest extends TestCase
             'name' => 'Budi Santoso',
             'email' => null,
             'password' => null,
-            'role' => \App\Enums\Role::Employee,
+            'role' => Role::Employee,
         ]);
     }
 
@@ -399,5 +400,97 @@ class BiometricEnrollmentTest extends TestCase
         $this->deviceGet($device, $secret, 'api/biometric/enrollments')
             ->assertOk()
             ->assertJsonCount(0, 'enrollments');
+    }
+
+    // ------------------------------------------------- identifikasi (catatan audit)
+
+    public function test_a_successful_identification_is_logged_without_creating_a_session(): void
+    {
+        [$device, $secret] = $this->device();
+        $this->employee('budi');
+
+        $this->devicePost($device, $secret, 'api/biometric/enrollments', $this->enrollmentPayload())->assertCreated();
+
+        $this->devicePost($device, $secret, 'api/biometric/identifications', [
+            'matched' => true,
+            'template_ref' => 'tpl-budi-1',
+            'quality' => 0,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('identification.matched', true)
+            ->assertJsonPath('identification.username', 'budi')
+            ->assertJsonPath('identification.finger', 'right-index-finger');
+
+        $this->assertDatabaseHas('test_logs', [
+            'event' => 'biometric_identified',
+            'user_id' => User::query()->where('username', 'budi')->value('id'),
+            'auth_method' => 'fingerprint',
+        ]);
+
+        // Sidik jari mengidentifikasi; ia tidak pernah mengautentikasi.
+        $this->assertGuest();
+    }
+
+    public function test_an_identification_with_an_unknown_template_is_rejected(): void
+    {
+        [$device, $secret] = $this->device();
+
+        $this->devicePost($device, $secret, 'api/biometric/identifications', [
+            'matched' => true,
+            'template_ref' => 'tpl-tidak-pernah-didaftarkan',
+        ])->assertStatus(422);
+
+        $this->assertDatabaseCount('test_logs', 0);
+    }
+
+    public function test_a_revoked_enrollment_can_no_longer_be_claimed_as_a_match(): void
+    {
+        [$device, $secret] = $this->device();
+        $this->employee('budi');
+
+        $this->devicePost($device, $secret, 'api/biometric/enrollments', $this->enrollmentPayload())->assertCreated();
+
+        BiometricEnrollment::query()->firstOrFail()->revoke();
+
+        $this->devicePost($device, $secret, 'api/biometric/identifications', [
+            'matched' => true,
+            'template_ref' => 'tpl-budi-1',
+        ])->assertStatus(422);
+    }
+
+    public function test_a_failed_match_is_logged_as_well(): void
+    {
+        [$device, $secret] = $this->device();
+
+        $this->devicePost($device, $secret, 'api/biometric/identifications', ['matched' => false])
+            ->assertCreated()
+            ->assertJsonPath('identification.matched', false)
+            ->assertJsonPath('identification.username', null);
+
+        $this->assertDatabaseHas('test_logs', [
+            'event' => 'biometric_identified',
+            'user_id' => null,
+        ]);
+
+        $this->assertGuest();
+    }
+
+    public function test_identification_rejects_an_unsigned_or_tampered_request(): void
+    {
+        [$device, $secret] = $this->device();
+
+        $this->postJson('/api/biometric/identifications', ['matched' => false])->assertUnauthorized();
+
+        // Ditandatangani untuk satu body, dikirim body lain.
+        $signed = json_encode(['matched' => false], JSON_THROW_ON_ERROR);
+        $sent = json_encode(['matched' => true, 'template_ref' => 'tpl-budi-1'], JSON_THROW_ON_ERROR);
+
+        $this->withHeaders(
+            $this->signature('POST', '/api/biometric/identifications', $signed, $secret, $device->uuid)
+                + ['Accept' => 'application/json', 'Content-Type' => 'application/json']
+        )->call('POST', '/api/biometric/identifications', [], [], [], [], $sent)
+            ->assertUnauthorized();
+
+        $this->assertDatabaseCount('test_logs', 0);
     }
 }

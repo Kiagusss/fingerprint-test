@@ -54,48 +54,86 @@ Cek dulu apakah sistem Anda sudah mengenali sensornya:
 ## 3. Pakai
 
     python3 heloklin-biometric-agent.py doctor
+    python3 heloklin-biometric-agent.py probe
     python3 heloklin-biometric-agent.py check
-    python3 heloklin-biometric-agent.py enroll --username budi --finger right-index-finger
+    python3 heloklin-biometric-agent.py enroll --username budi --finger right-index-finger --capture libfprint
+    python3 heloklin-biometric-agent.py identify
 
 - `doctor` melaporkan OS, apakah pemindai terlihat, apakah jalur pembacaan jari
   tersedia, dan apakah server menerima kredensial perangkat.
+- `probe` melaporkan kesiapan libfprint: kemampuan perangkat (`supports_identify`
+  yang menentukan hidup-matinya 1:N) dan tanda tangan fungsi yang dipakai agen.
+  Tidak menyentuh jari sama sekali.
 - `check` melakukan heartbeat dan menampilkan pendaftaran yang akan diterima agen.
 - `enroll` membaca jari lalu melaporkan pendaftarannya. Perintah ini akan
   meminta jari pada perangkat — inilah tahap prompt yang Anda tunggu.
+- `identify` mencocokkan satu jari dengan SEMUA template di penyimpanan lokal
+  (1:N), lalu melaporkan hasilnya ke server. Ini langkah "tempel jari, sistem
+  tahu siapa". Ia tidak membuat sesi login: masuk ke akun tetap butuh
+  password/passkey.
 
 `enroll` menerima pilihan cara membaca jari:
 
 | `--capture` | Artinya |
 |---|---|
 | `auto` (default) | pakai fprintd bila ada, selain itu pakai `--capture-command` |
-| `fprintd` | baca lewat `fprintd-enroll` (Linux, butuh libfprint yang mengenali pemindainya) |
+| `fprintd` | baca lewat `fprintd-enroll` (Linux). Pendaftarannya TIDAK bisa dipakai untuk identifikasi |
+| `libfprint` | libfprint langsung, template disimpan di penyimpanan agen sendiri. Inilah jalur yang bisa identifikasi 1:N |
 | `command` | jalankan perintah Anda sendiri lewat `--capture-command`; exit 0 = jari berhasil dibaca. Boleh mencetak satu baris berisi template_ref ke stdout |
 | `none` | tidak membaca apa pun; hanya untuk menguji jalur API (wajib sertakan `--template-ref`) |
+
+Template dari `--capture libfprint` disimpan di
+`~/.config/heloklin-biometric/prints/` (direktori 0700, setiap berkas 0600,
+ditambah `index.json` yang memetakan template ke orang dan jari).
 
 Contoh untuk Windows dengan helper SDK vendor:
 
     python3 heloklin-biometric-agent.py enroll --username budi --finger right-index-finger ^
         --capture command --capture-command "C:\heloklin\capture.exe --finger right-index-finger"
 
-## 4. Batas yang harus Anda tahu
+## 4. Akses USB di Linux — wajib untuk jalur libfprint
 
-**Enrolmen sudah bisa. Identifikasi 1:N belum.** Enrolmen tidak membutuhkan
-identifikasi: admin sudah tahu karyawan mana yang sedang didaftarkan, dan
-karyawan hanya perlu menempelkan jari. Yang membutuhkan 1:N adalah langkah login
-"tempel jari, sistem tahu siapa" — itu menuntut fungsi identify/search di SDK
-pemindai.
+`fprintd` berjalan sebagai root, agen tidak. Tanpa aturan udev, membuka pemindai
+langsung gagal dengan:
 
-**fprintd hanya cocok untuk satu orang per akun Linux.** fprintd menyimpan
-template per (akun Linux, nama jari) dan tidak bisa membedakan karyawan. Di PC
-bersama yang memakai satu akun Linux, mendaftarkan karyawan kedua dengan nama
-jari yang sama akan menimpa yang pertama. Karena itu `--username` selalu
-diberikan oleh operator, bukan disimpulkan dari hasil pembacaan.
+    g-usb-device-error-quark: USB error on device 2541:0236 : Access denied (insufficient permissions) [-3]
 
-Jalur yang benar untuk PC bersama adalah memakai libfprint langsung dengan
-penyimpanan template milik kita sendiri (`fp_device_enroll` → `FpPrint` →
-penyimpanan sendiri → `fp_device_identify_start`). Itu sekaligus menyelesaikan
-1:N. Belum dikerjakan karena menunggu pemindai Anda terbukti jalan dengan
-driver komunitas tersebut.
+Beri akses ke pengguna sesi lokal dengan aturan udev (sekali saja, perlu sudo):
+
+    printf '%s\n' 'SUBSYSTEM=="usb", ATTRS{idVendor}=="2541", ATTRS{idProduct}=="0236", TAG+="uaccess", MODE="0660"' | sudo tee /etc/udev/rules.d/60-cs9711-fingerprint.rules
+    sudo udevadm control --reload-rules
+    sudo udevadm trigger --subsystem-match=usb
+
+Lalu buktikan dengan `probe`: baris `uji buka perangkat` harus berhasil, bukan
+`Access denied`. Jalankan dari sesi desktop laptop itu, bukan lewat SSH, karena
+`TAG+="uaccess"` hanya berlaku untuk pengguna sesi lokal yang aktif.
+
+Kalau tetap ditolak dan Anda bekerja lewat SSH, pakai grup sebagai gantinya:
+
+    sudo groupadd -f plugdev
+    sudo usermod -aG plugdev "$USER"        # login ulang setelah ini
+    printf '%s\n' 'SUBSYSTEM=="usb", ATTRS{idVendor}=="2541", ATTRS{idProduct}=="0236", MODE="0660", GROUP="plugdev"' | sudo tee /etc/udev/rules.d/60-cs9711-fingerprint.rules
+    sudo udevadm control --reload-rules
+    sudo udevadm trigger --subsystem-match=usb
+
+## 5. Batas yang harus Anda tahu
+
+**Identifikasi 1:N sudah ada — lewat `--capture libfprint`, bukan lewat fprintd.**
+Perbedaan itu bukan gaya penulisan: fprintd menyimpan template per (akun Linux,
+nama jari) di `/var/lib/fprint` yang hanya bisa dibaca root, sehingga jari satu
+orang tidak bisa dicocokkan ke orang lain. Agen `libfprint` menyimpan template
+di penyimpanannya sendiri, dan justru itu yang memungkinkan satu jari dicocokkan
+ke semua template sekaligus.
+
+**Identifikasi tetap bukan autentikasi.** `identify` hanya menjawab "ini siapa".
+Tidak ada sesi, token, maupun cookie yang dibuat — baik di agen maupun di
+endpoint `/api/biometric/identifications`. Yang membuktikan identitas tetap
+password/passkey milik karyawan itu di `/login`.
+
+**Template hanya ada di PC tempat pendaftaran dilakukan.** Penyimpanan agen
+bersifat lokal, jadi karyawan yang memakai dua PC harus didaftarkan di keduanya.
+Penyimpanan terpusat belum ada; kalau nanti dibutuhkan, `template_ref` sudah
+menjadi penunjuk yang bisa dipindahkan.
 
 **Skor mutu.** `fprintd` tidak melaporkan skor, jadi `enroll` mengirim
 `quality=0` kecuali Anda memberi `--quality`. Angka 0 berarti "tidak ada skor

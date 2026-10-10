@@ -245,7 +245,7 @@ def capture_command(command: str) -> str:
     return template_ref or f"command:{platform.node()}:{int(time.time())}"
 
 
-def run_capture(backend: str, finger: str, command: str | None) -> str:
+def run_capture(backend: str, finger: str, command: str | None, username: str = "", device_uuid: str = "") -> str:
     """Jalankan pembacaan jari dan kembalikan template_ref-nya."""
     chosen = backend
 
@@ -266,6 +266,11 @@ def run_capture(backend: str, finger: str, command: str | None) -> str:
             )
 
     if chosen == "fprintd":
+        print(">> Catatan: pendaftaran lewat fprintd TIDAK bisa dipakai untuk identifikasi.")
+        print("   fprintd menyimpan template per akun Linux dan namanya tidak bisa dicocokkan")
+        print("   lintas orang. Untuk alur 'tempel jari lalu sistem tahu siapa', pakai")
+        print("   --capture libfprint.")
+
         return capture_fprintd(finger, os.environ.get("USER") or os.environ.get("LOGNAME") or "user")
 
     if chosen == "command":
@@ -273,10 +278,310 @@ def run_capture(backend: str, finger: str, command: str | None) -> str:
             raise AgentError("--capture command memerlukan --capture-command '<perintah>'.")
         return capture_command(command)
 
+    if chosen == "libfprint":
+        return capture_libfprint(finger, username, device_uuid)
+
     if chosen == "none":
         return ""
 
     raise AgentError(f"Backend pendaftaran tidak dikenal: {chosen}")
+
+
+# ------------------------------------------- backend libfprint (penyimpanan sendiri)
+
+# Template disimpan OLEH KITA, bukan oleh fprintd. Hanya dengan begitu satu jari
+# bisa dicocokkan ke semua orang yang terdaftar di PC itu (identifikasi 1:N).
+PRINT_STORE = os.path.join(os.path.dirname(DEFAULT_CONFIG), "prints")
+PRINT_INDEX = os.path.join(PRINT_STORE, "index.json")
+
+# Nama jari gaya fprintd -> anggota enum FPrint.Finger (libfprint).
+FINGER_ENUM = {
+    "right-thumb": "RIGHT_THUMB",
+    "right-index-finger": "RIGHT_INDEX",
+    "right-middle-finger": "RIGHT_MIDDLE",
+    "right-ring-finger": "RIGHT_RING",
+    "right-little-finger": "RIGHT_LITTLE",
+    "left-thumb": "LEFT_THUMB",
+    "left-index-finger": "LEFT_INDEX",
+    "left-middle-finger": "LEFT_MIDDLE",
+    "left-ring-finger": "LEFT_RING",
+    "left-little-finger": "LEFT_LITTLE",
+}
+
+
+def libfprint_module():
+    """Impor FPrint dari PyGObject hanya saat benar-benar dipakai."""
+    try:
+        import gi
+
+        gi.require_version("FPrint", "2.0")
+        from gi.repository import FPrint
+    except Exception as error:  # noqa: BLE001 - pesannya harus bisa dibaca pengguna
+        raise AgentError(
+            "libfprint tidak bisa dipakai dari Python: {error}\n"
+            "Pasang: sudo apt install python3-gi gir1.2-fprint-2.0\n"
+            "Periksa dengan: python3 {script} probe".format(
+                error=error, script=os.path.basename(__file__)
+            )
+        ) from error
+
+    return FPrint
+
+
+def open_print_device():
+    """Buka pemindai pertama yang ditemukan libfprint."""
+    FPrint = libfprint_module()
+    devices = FPrint.Context().get_devices()
+
+    if not devices:
+        raise AgentError(
+            "libfprint tidak menemukan pemindai. Jalankan `probe` untuk melihat apa "
+            "yang terdeteksi."
+        )
+
+    device = devices[0]
+
+    try:
+        device.open_sync()
+    except Exception as error:  # noqa: BLE001
+        raise AgentError(
+            "Pemindai {name} tidak bisa dibuka: {error}\n"
+            "Bila pesannya 'Access denied', perangkat VID {vid} belum punya aturan udev "
+            "untuk pengguna sesi lokal. Lihat agent/README.md bagian akses USB.".format(
+                name=device.get_name(), error=error, vid=VENDOR_USB_ID
+            )
+        ) from error
+
+    return FPrint, device
+
+
+def load_print_index() -> list[dict]:
+    try:
+        with open(PRINT_INDEX, encoding="utf-8") as handle:
+            rows = json.load(handle)
+    except (OSError, ValueError):
+        return []
+
+    return rows if isinstance(rows, list) else []
+
+
+def save_print_index(rows: list[dict]) -> None:
+    os.makedirs(PRINT_STORE, mode=0o700, exist_ok=True)
+
+    temporary = PRINT_INDEX + ".tmp"
+
+    with open(temporary, "w", encoding="utf-8") as handle:
+        json.dump(rows, handle, ensure_ascii=False, indent=2)
+
+    os.chmod(temporary, 0o600)
+    os.replace(temporary, PRINT_INDEX)
+
+
+def print_bytes(print_) -> bytes:
+    """Template ter-serialisasi. libfprint memberikannya sebagai list byte."""
+    data = print_.serialize()
+
+    return data if isinstance(data, (bytes, bytearray)) else bytes(data)
+
+
+def prints_equal(FPrint, left, right) -> bool:
+    """Apakah dua FpPrint menunjuk template yang sama."""
+    try:
+        if left == right:
+            return True
+    except Exception:  # noqa: BLE001
+        pass
+
+    try:
+        return bool(FPrint.Print.equal(left, right))
+    except Exception:  # noqa: BLE001 - fungsi ini tidak ada di semua versi
+        return False
+
+
+def capture_libfprint(finger: str, username: str, device_uuid: str) -> str:
+    """Pendaftaran lewat libfprint langsung, disimpan di penyimpanan kita sendiri.
+
+    Ini satu-satunya jalur yang juga bisa identifikasi 1:N: template hidup di
+    penyimpanan kita, sehingga satu jari bisa dicocokkan ke semua orang.
+    """
+    FPrint, device = open_print_device()
+
+    try:
+        stages = device.get_nr_enroll_stages()
+
+        print(f">> Tempelkan jari pada pemindai sekarang ({finger}).")
+        print(f"   Butuh sekitar {stages} tahap; ikuti hitungan di bawah.")
+
+        template = FPrint.Print.new(device)
+        template.set_finger(getattr(FPrint.Finger, FINGER_ENUM.get(finger, "UNKNOWN")))
+
+        try:
+            template.set_username(username)
+        except Exception:  # noqa: BLE001 - tidak ada di semua versi
+            pass
+
+        def on_progress(device_, progress, print_, *_rest):
+            sys.stdout.write(f"\r   tahap {progress}/{stages}")
+            sys.stdout.flush()
+
+        enrolled = device.enroll_sync(template, None, on_progress)
+
+        sys.stdout.write("\r" + " " * 40 + "\r")
+    finally:
+        device.close_sync()
+
+    if enrolled is None:
+        raise AgentError("Pendaftaran gagal: perangkat tidak menghasilkan template.")
+
+    blob = print_bytes(enrolled)
+    print_id = hashlib.sha256(blob).hexdigest()[:16]
+    filename = f"{print_id}.print"
+    path = os.path.join(PRINT_STORE, filename)
+
+    os.makedirs(PRINT_STORE, mode=0o700, exist_ok=True)
+
+    with open(path, "wb") as handle:
+        handle.write(blob)
+
+    os.chmod(path, 0o600)
+
+    template_ref = f"libfprint:{platform.node()}:{username}:{finger}:{print_id}"
+
+    rows = [row for row in load_print_index() if row.get("template_ref") != template_ref]
+    rows.append({
+        "print_id": print_id,
+        "file": filename,
+        "username": username,
+        "finger": finger,
+        "device_uuid": device_uuid,
+        "template_ref": template_ref,
+        "bytes": len(blob),
+        "created_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+    })
+    save_print_index(rows)
+
+    print(f"   template       : {filename} ({len(blob)} byte, mode 0600)")
+    print(f"   penyimpanan    : {PRINT_STORE}")
+
+    return template_ref
+
+
+# --------------------------------------------------------------------------- perintah
+
+
+def cmd_identify(config: dict, args: argparse.Namespace) -> int:
+    """Cocokkan satu jari dengan SEMUA template lokal (1:N) lalu laporkan hasilnya.
+
+    Perangkat yang harus tahu siapa pemilik jari itu; server hanya menerima
+    laporan dan menentukan nama akunnya dari catatan pendaftaran yang ia miliki.
+    Tidak ada sesi login yang dibuat di mana pun.
+    """
+    FPrint = libfprint_module()
+
+    index = load_print_index()
+
+    if not index:
+        raise AgentError(
+            "Belum ada template di penyimpanan lokal ({store}).\n"
+            "Daftarkan dulu: python3 {script} enroll --username <user> "
+            "--finger right-index-finger --capture libfprint".format(
+                store=PRINT_STORE, script=os.path.basename(__file__)
+            )
+        )
+
+    loaded = []
+
+    for row in index:
+        path = os.path.join(PRINT_STORE, str(row.get("file")))
+
+        try:
+            with open(path, "rb") as handle:
+                blob = handle.read()
+
+            loaded.append((row, FPrint.Print.deserialize(list(blob)), blob))
+        except Exception as error:  # noqa: BLE001
+            print(f"   lewati {row.get('file')}: {error}", file=sys.stderr)
+
+    if not loaded:
+        raise AgentError("Tidak ada template yang bisa dimuat dari penyimpanan lokal.")
+
+    seen: list = []
+
+    FPrint_, device = open_print_device()
+
+    try:
+        print(f">> Tempelkan jari pada pemindai sekarang. Mencocokkan dengan {len(loaded)} template.")
+
+        def on_match(device_, *rest):
+            # Bentuk callback berbeda antar versi libfprint; rekam apa yang ada.
+            for argument in rest:
+                if isinstance(argument, FPrint.Print):
+                    seen.append(argument)
+
+        try:
+            result = device.identify_sync([item[1] for item in loaded], None, on_match)
+        except Exception as error:  # noqa: BLE001
+            text = str(error).lower()
+
+            if "no-match" in text or "no match" in text or "not found" in text:
+                result = None
+            else:
+                raise
+    finally:
+        device.close_sync()
+
+    match = result[0] if isinstance(result, tuple) else result
+
+    if match is None and seen:
+        match = seen[-1]
+
+    row = None
+
+    if match is not None:
+        matched_bytes = print_bytes(match)
+
+        for entry, candidate, blob in loaded:
+            if matched_bytes == blob or prints_equal(FPrint, match, candidate):
+                row = entry
+                break
+
+    # Nama akun ditentukan server dari catatan pendaftarannya sendiri.
+    person = None
+    status, body = signed_request(config, "GET", "/api/biometric/enrollments", None)
+
+    if status == 200 and row is not None:
+        person = next(
+            (item for item in body.get("enrollments", []) if item.get("template_ref") == row.get("template_ref")),
+            None,
+        )
+
+    reported, report_body = signed_request(config, "POST", "/api/biometric/identifications", {
+        "matched": row is not None,
+        "template_ref": row.get("template_ref") if row is not None else None,
+        "quality": 0,
+    })
+
+    if reported != 201:
+        print(f"GAGAL melaporkan ke server (HTTP {reported}): {json.dumps(report_body, ensure_ascii=False)}", file=sys.stderr)
+        return 1
+
+    if row is None:
+        print("Tidak ada jari yang cocok dengan template mana pun.")
+        print("Percobaan ini tetap tercatat di server sebagai percobaan gagal.")
+        return 1
+
+    username = (person or {}).get("username") or row.get("username") or "?"
+
+    print("Jari cocok.")
+    print(f"  username     : {username}")
+    print(f"  jari         : {row.get('finger')}")
+    print(f"  template_ref : {row.get('template_ref')}")
+    print(f"  dilaporkan   : {report_body.get('identification', {}).get('logged_at', '-')}")
+    print()
+    print("Riwayatnya di https://login.heloklin.com/dashboard (tabel log di bagian bawah).")
+    print("Catatan: ini identifikasi, bukan autentikasi — masuk ke akun tetap butuh password.")
+
+    return 0
 
 
 # --------------------------------------------------------------------------- perintah
@@ -359,7 +664,13 @@ def cmd_enroll(config: dict, args: argparse.Namespace) -> int:
     if args.finger not in FINGERS:
         raise AgentError("Jari harus salah satu dari: " + ", ".join(FINGERS))
 
-    template_ref = args.template_ref or run_capture(args.capture, args.finger, args.capture_command)
+    template_ref = args.template_ref or run_capture(
+        args.capture,
+        args.finger,
+        args.capture_command,
+        args.username,
+        config.get("BIOMETRIC_DEVICE_UUID", ""),
+    )
 
     if not template_ref:
         # Backend `none`: kirim penunjuk yang jelas-jelas bukan template perangkat.
@@ -546,10 +857,16 @@ def build_parser() -> argparse.ArgumentParser:
     enroll.add_argument(
         "--capture",
         default="auto",
-        choices=["auto", "fprintd", "command", "none"],
-        help="cara membaca pemindai (default auto)",
+        choices=["auto", "fprintd", "libfprint", "command", "none"],
+        help="cara membaca pemindai (default auto; 'libfprint' untuk jalur identifikasi)",
     )
     enroll.add_argument("--capture-command", help="perintah pendaftaran sendiri, untuk SDK vendor")
+
+    sub.add_parser(
+        "identify",
+        parents=[parent],
+        help="cocokkan satu jari dengan semua template lokal (1:N) lalu laporkan ke server",
+    )
 
     return parser
 
@@ -598,6 +915,9 @@ def main() -> int:
 
         if args.command == "check":
             return cmd_check(config)
+
+        if args.command == "identify":
+            return cmd_identify(config, args)
 
         return cmd_enroll(config, args)
     except AgentError as error:

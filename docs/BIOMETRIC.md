@@ -167,6 +167,29 @@ bisa melihat perangkat mana yang masih hidup.
 - Balasan `201` berisi ringkasan pendaftaran. Kesalahan validasi: `422` dengan
   `errors` seperti validasi Laravel biasa.
 
+### 3.5 `POST /identifications`
+
+Laporan hasil pencocokan satu jari. **Murni catatan audit**: endpoint ini tidak
+membuat sesi, token, maupun cookie.
+
+```json
+{
+  "matched": true,
+  "template_ref": "libfprint:agusbtw:budi:right-index-finger:1a2b3c4d5e6f7788",
+  "quality": 0
+}
+```
+
+- `matched: true` mewajibkan `template_ref` yang menunjuk pendaftaran **aktif**.
+  Klaim agen tidak dipercaya begitu saja: server mencari sendiri pendaftaran itu,
+  dan menjawab `422` bila tidak ada (termasuk bila sudah dicabut).
+- `matched: false` juga dicatat. Percobaan jari yang tidak dikenal adalah
+  peristiwa yang perlu terlihat, bukan yang perlu disembunyikan.
+- Balasan `201` berisi `identification.username`, `finger`, dan `logged_at` —
+  nama akun ditentukan server dari catatannya sendiri, bukan dari klaim agen.
+- Setiap panggilan menulis satu baris `test_logs` dengan event
+  `biometric_identified`, sehingga muncul di `/dashboard` tanpa perlu tabel baru.
+
 ## 4. Alur di PC bersama
 
 1. **Enrolmen** (sekali per karyawan): admin memilih karyawan di agen, karyawan
@@ -175,7 +198,10 @@ bisa melihat perangkat mana yang masih hidup.
    Halaman `/biometric-devices` menampilkannya.
 2. **Identifikasi**: karyawan menempelkan jari, agen mencocokkan 1:N secara lokal
    dan mendapat `username`, lalu halaman login memakai username itu untuk langkah
-   berikutnya — password/passkey milik karyawan itu tetap diminta.
+   berikutnya — password/passkey milik karyawan itu tetap diminta. Agen
+   melaporkan hasilnya lewat `POST /identifications`, dan baris auditnya muncul
+   di `/dashboard`. Pada agen ini langkah itu dijalankan perintah `identify`
+   dengan penyimpanan template milik agen sendiri (lihat `agent/README.md` §3).
 3. **Pencabutan**: admin mencabut di `/biometric-devices`; agen berhenti menerima
    pendaftaran itu pada sinkronisasi berikutnya.
 
@@ -185,14 +211,14 @@ Perangkat yang sudah ada (Chipsailing CS9711, USB `2541:0236`) adalah
 **match-on-host**: sensornya hanya mengalirkan gambar, seluruh pencocokan di
 software. Yang harus dipastikan lebih dulu:
 
-1. **SDK mendukung 1:N (identifikasi terhadap banyak template)**, bukan hanya 1:1
-   (mencocokkan dua template). Windows: periksa `CSAlgDll.dll` — cari fungsi
-   semacam *identify*/*search*/`1:N`, bukan hanya *verify*/*match* dua template.
-   Bila SDK hanya menyediakan 1:1, alur "tempel jari, sistem tahu siapa" TIDAK
-   bisa dibuat dengan perangkat ini.
-2. **Dukungan per OS**. Windows: SDK vendor (DLL tertutup). Linux: hanya lewat
-   fork komunitas `libfprint-CS9711` (matcher `sigfm`); verifikasi 1:1 lewat
-   `fprintd`, 1:N harus memakai libfprint langsung. **macOS tidak didukung.**
+1. ~~**SDK mendukung 1:N**~~ — **sudah terjawab: ya.** Perangkat nyata melaporkan
+   `supports_identify: True` dari libfprint (`probe` di `agent/README.md` §3),
+   jadi 1:N bisa lewat libfprint langsung dengan penyimpanan template agen
+   sendiri. Jalur fprintd tetap hanya 1:1/1:per-akun. Kalau nanti perangkat
+   diganti, periksa ulang dengan `probe` sebelum menjanjikan alur ini.
+2. **Dukungan per OS**. Windows: SDK vendor (DLL tertutup). Linux: fork komunitas
+   `libfprint-CS9711` (matcher `sigfm`) — perlu aturan udev supaya agen non-root
+   boleh membuka pemindainya (`agent/README.md` §4). **macOS tidak didukung.**
 3. **Deteksi liveness.** Tanpa itu, cetakan atau gelatin dapat menipu pemindai.
 4. **Mutu template.** Perangkat ini butuh 15 sentuhan per jari untuk enrol dan
    matcher-nya dioptimalkan untuk sensor kecil, jadi FAR/FRR untuk 1:N tidak

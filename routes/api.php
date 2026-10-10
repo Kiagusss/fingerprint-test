@@ -34,4 +34,9 @@ Route::middleware('biometric.device')->prefix('biometric')->name('biometric.')->
     // Laporan satu jari yang baru selesai didaftarkan.
     Route::post('/enrollments', [BiometricDeviceController::class, 'storeEnrollment'])
         ->name('enrollments.store');
+
+    // Laporan hasil pencocokan satu jari. Murni catatan audit: route ini tidak
+    // membuat sesi, token, maupun cookie — lihat storeIdentification().
+    Route::post('/identifications', [BiometricDeviceController::class, 'storeIdentification'])
+        ->name('identifications.store');
 });
