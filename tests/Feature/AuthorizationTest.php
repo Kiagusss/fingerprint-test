@@ -80,11 +80,15 @@ class AuthorizationTest extends TestCase
         ])->assertUnauthorized();
     }
 
-    public function test_passkey_registration_requires_password_confirmation(): void
+    public function test_passkey_registration_requires_confirmation(): void
     {
         $user = User::factory()->admin()->create();
 
-        // Authenticated but not confirmed -> password.confirm returns 423.
+        // Authenticated but not confirmed -> passkey.confirm returns 423.
+        // Only the local environment has the "bootstrap without confirmation"
+        // carve-out; force it off so the gate itself is what is tested.
+        config(['passkeys.bootstrap_without_confirmation' => false]);
+
         $this->actingAs($user)
             ->getJson(route('passkey.registration-options'))
             ->assertStatus(423);
@@ -101,11 +105,35 @@ class AuthorizationTest extends TestCase
     {
         // Force the app out of the "testing" env so the CSRF middleware is not
         // skipped by runningUnitTests() — this must prove the real check runs.
+        // The route always exists; only the controller gates the flag.
+        config(['auth.enable_password_login' => true]);
+
         $this->app['env'] = 'local';
 
         $this->post(route('login.store'), [
             'username' => 'test-admin',
             'password' => 'password',
         ])->assertStatus(419);
+    }
+
+    /**
+     * Instalasi ini passwordless: jalur password nonaktif secara default. Rute
+     * POST /login tetap ada (agar proteksi CSRF bisa diuji) tetapi controller
+     * menolaknya, dan form password tidak pernah dirender.
+     */
+    public function test_password_login_is_disabled_by_default(): void
+    {
+        User::factory()->admin()->create(['username' => 'test-admin']);
+
+        $this->post(route('login.store'), [
+            'username' => 'test-admin',
+            'password' => 'password',
+        ])->assertNotFound();
+
+        $this->assertGuest();
+
+        $this->get(route('login'))
+            ->assertOk()
+            ->assertDontSee('name="password"', false);
     }
 }

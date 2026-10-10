@@ -59,7 +59,7 @@ class TestCatalog
                 'category' => 'webauthn',
                 'title' => 'Verifikasi ulang (confirmation) sebelum kelola passkey',
                 'source' => 'manual',
-                'expected' => 'Menambah/mencabut passkey meminta konfirmasi Windows Hello terlebih dahulu (middleware password.confirm).',
+                'expected' => 'Menambah/mencabut passkey meminta konfirmasi Windows Hello terlebih dahulu (middleware passkey.confirm).',
                 'automated_test' => null,
             ],
             [

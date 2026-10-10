@@ -17,6 +17,15 @@ class SessionIsolationTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Tes ini memodelkan pemulihan lewat jalur password; aktifkan agar
+        // alurnya dapat diuji. Jalur ini nonaktif secara default di produksi.
+        config(['auth.enable_password_login' => true]);
+    }
+
     public function test_two_sessions_keep_separate_identities(): void
     {
         $admin = User::factory()->admin()->create(['username' => 'test-admin']);

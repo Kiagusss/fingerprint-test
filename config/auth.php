@@ -114,4 +114,36 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Fallback Login Password (pemulihan saja)
+    |--------------------------------------------------------------------------
+    |
+    | Instalasi ini passwordless: karyawan masuk lewat sidik jari dan tidak
+    | pernah menerima password. Form username/password di /login dipertahankan
+    | hanya sebagai jalur pemulihan bila semua passkey hilang. Default false
+    | agar tidak ada jalur password yang aktif pada instalasi nyata.
+    |
+    | Saat false: rute POST /login tidak didaftarkan dan GET /login tidak
+    | menampilkan form password sama sekali.
+    |
+    */
+
+    'enable_password_login' => env('AUTH_ENABLE_PASSWORD_LOGIN', false),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Bootstrap Key
+    |--------------------------------------------------------------------------
+    |
+    | Rute /bootstrap (registrasi admin pertama) hanya boleh dipakai selama
+    | belum ada user sama sekali. Di luar environment `local`, rute itu
+    | mensyaratkan ?key= yang cocok dengan nilai ini. Bila kosong => gagal-
+    | tertutup (bootstrap nonaktif). Dibaca lewat config, bukan env(), agar
+    | tetap benar ketika konfigurasi di-cache.
+    |
+    */
+
+    'bootstrap_key' => env('BOOTSTRAP_KEY'),
+
 ];

@@ -33,6 +33,10 @@ class TestLogger
         'access_denied',
         'session_probe',
         'test_result_updated',
+        'employee_created',
+        'employee_passkey_enrolled',
+        'employee_passkey_revoked',
+        'bootstrap_passkey_enrolled',
     ];
 
     public function log(string $event, array $context = []): TestLog

@@ -26,6 +26,7 @@
                     <a href="{{ route('documentation') }}" class="rounded px-2.5 py-1.5 {{ request()->routeIs('documentation') ? 'bg-ink-100 font-medium text-ink-900' : 'text-ink-600 hover:bg-ink-100' }}">Dokumentasi</a>
 
                     @if(auth()->user()->isAdmin())
+                        <a href="{{ route('employees.index') }}" class="rounded px-2.5 py-1.5 {{ request()->routeIs('employees.*') ? 'bg-ink-100 font-medium text-ink-900' : 'text-ink-600 hover:bg-ink-100' }}">Karyawan</a>
                         <a href="{{ route('admin.test') }}" class="rounded px-2.5 py-1.5 {{ request()->routeIs('admin.test') ? 'bg-ink-100 font-medium text-ink-900' : 'text-ink-600 hover:bg-ink-100' }}">Admin Test</a>
                     @endif
                     @if(auth()->user()->isSupervisor())

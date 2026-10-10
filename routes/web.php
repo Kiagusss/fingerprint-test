@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\BootstrapController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentationController;
+use App\Http\Controllers\EmployeeEnrollmentController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\PasskeyManagementController;
@@ -23,13 +25,31 @@ Route::get('/locale/{locale}', LocaleController::class)->name('locale');
 
 /*
 |--------------------------------------------------------------------------
-| Authentication (fallback username/password — primary is passkey)
+| Bootstrap (tanpa password, sekali jalan)
 |--------------------------------------------------------------------------
-| The passkey endpoints themselves are registered by laravel/passkeys at:
-|   GET  /passkeys/login/options   POST /passkeys/login
-|   GET  /passkeys/confirm/options POST /passkeys/confirm
-|   GET  /user/passkeys/options    POST /user/passkeys
-|   DELETE /user/passkeys/{passkey}
+| Register admin pertama dengan sidik jari saja. Hanya berfungsi selama belum
+| ada user sama sekali, lalu menutup diri sendiri (lihat BootstrapController).
+| Di luar environment `local`, wajib menyertakan ?key= yang cocok dengan
+| BOOTSTRAP_KEY — bila kunci tidak disetel, rute gagal-tertutup.
+*/
+
+Route::prefix('bootstrap')->name('bootstrap.')->group(function () {
+    Route::get('/', [BootstrapController::class, 'show'])->name('show');
+    Route::post('/options', [BootstrapController::class, 'options'])->name('options');
+    Route::post('/passkey', [BootstrapController::class, 'store'])->name('store');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Authentication
+|--------------------------------------------------------------------------
+| Jalur utama adalah passkey (passwordless, discoverable credential): server
+| tidak meminta username sama sekali. Form username/password di /login hanya
+| tampil bila AUTH_ENABLE_PASSWORD_LOGIN=true.
+|
+| Rute POST selalu terdaftar agar proteksi CSRF tetap dapat diuji, tetapi
+| controller menutupnya dengan 404 selama flag pemulihan dimatikan — jadi
+| tidak ada jalur password yang benar-benar aktif pada instalasi passwordless.
 */
 
 Route::middleware('guest:web')->group(function () {
@@ -46,12 +66,34 @@ Route::middleware('guest:web')->group(function () {
 */
 
 Route::middleware('auth:web')->group(function () {
+    // Halaman baca: cukup terautentikasi. (Karyawan tidak punya halaman ini,
+    // tetapi admin/supervisor memakainya untuk diagnostik.)
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/passkeys', PasskeyManagementController::class)->name('passkeys.index');
+
     Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
 
-    // Passkey management UI (list + register + revoke). Registration/revocation
-    // themselves go through the package routes, which sit behind password.confirm.
-    Route::get('/passkeys', PasskeyManagementController::class)->name('passkeys.index');
+    /*
+     * Pendaftaran sidik jari karyawan oleh admin/IT. Admin memilih karyawan,
+     * lalu sidik jari karyawan itu ditempelkan di perangkatnya. Endpoint bawaan
+     * paket tidak bisa dipakai untuk ini karena selalu bekerja pada user yang
+     * sedang login — karena itu ada controller khusus.
+     *
+     * Halaman daftar cukup role admin; SETIAP tindakan yang membuat/mengubah
+     * kredensial wajib dikonfirmasi ulang (passkey.confirm).
+     */
+    Route::middleware('role:admin')->prefix('employees')->name('employees.')->group(function () {
+        Route::get('/', [EmployeeEnrollmentController::class, 'index'])->name('index');
+
+        Route::middleware('passkey.confirm')->group(function () {
+            Route::post('/', [EmployeeEnrollmentController::class, 'create'])->name('create');
+            Route::post('/cancel', [EmployeeEnrollmentController::class, 'cancel'])->name('cancel');
+            Route::post('/{employee}/prepare', [EmployeeEnrollmentController::class, 'prepare'])->name('prepare');
+            Route::post('/{employee}/options', [EmployeeEnrollmentController::class, 'options'])->name('options');
+            Route::post('/{employee}/passkey', [EmployeeEnrollmentController::class, 'storePasskey'])->name('store-passkey');
+            Route::delete('/passkeys/{passkey}', [EmployeeEnrollmentController::class, 'revoke'])->name('revoke');
+        });
+    });
 
     // Role-gated demonstrator pages. The role is enforced from users.role by the
     // `role` middleware, never from anything the client supplies.
@@ -70,3 +112,16 @@ Route::middleware('auth:web')->group(function () {
     // Configuration documentation / runbook.
     Route::get('/documentation', [DocumentationController::class, 'index'])->name('documentation');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Passkey endpoints (registered by laravel/passkeys)
+|--------------------------------------------------------------------------
+|   GET  /passkeys/login/options   POST /passkeys/login
+|   GET  /passkeys/confirm/options POST /passkeys/confirm
+|   GET  /user/passkeys/options    POST /user/passkeys
+|   DELETE /user/passkeys/{passkey}
+|
+| Rute manajemen (registrasi/penghapusan) memakai `passkey.confirm`, bukan
+| `password.confirm` — lihat config/passkeys.php `management_middleware`.
+*/

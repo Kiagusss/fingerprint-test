@@ -53,6 +53,31 @@ class User extends Authenticatable implements PasskeyUser
         return $this->role === Role::Supervisor;
     }
 
+    public function isEmployee(): bool
+    {
+        return $this->role === Role::Employee;
+    }
+
+    /**
+     * Nama yang tampil di prompt Windows Hello.
+     *
+     * Menimpa versi trait agar akun tanpa email (karyawan) tetap punya nama yang
+     * enak dibaca, bukan "nama ?? id".
+     */
+    public function getPasskeyDisplayName(): string
+    {
+        return $this->name ?: $this->username ?: 'User #'.$this->getKey();
+    }
+
+    /**
+     * Identifier akun di prompt Windows Hello. Jatuh ke username, bukan id,
+     * supaya karyawan bisa mengenali entri miliknya.
+     */
+    public function getPasskeyUsername(): string
+    {
+        return $this->email ?: $this->username ?: (string) $this->getKey();
+    }
+
     public function hasRole(Role ...$roles): bool
     {
         return in_array($this->role, $roles, true);

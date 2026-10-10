@@ -191,6 +191,75 @@ export const confirmWithPasskey = async () => {
 
 export const deletePasskey = (id) => jsonFetch(`/user/passkeys/${id}`, { method: 'DELETE' });
 
+// ---------------------------------------------------------------------------
+// Pendaftaran sidik jari karyawan (dilakukan oleh admin, lintas pengguna).
+//
+// Berbeda dari registerPasskey() yang selalu mendaftarkan untuk user yang
+// sedang login, dua fungsi ini menyasar karyawan yang dipilih admin. Otorisasi
+// sepenuhnya di server: id karyawan diteruskan dan divalidasi di sana, sidik
+// jari tetap diverifikasi oleh validator WebAuthn paket.
+// ---------------------------------------------------------------------------
+
+/**
+ * Ambil opsi registrasi untuk karyawan target.
+ *
+ * @param {number|string} employeeId
+ */
+export const requestEmployeeEnrollmentOptions = async (employeeId) => {
+    const { options } = await jsonFetch(`/employees/${employeeId}/options`, { method: 'POST' });
+
+    return options;
+};
+
+/**
+ * Daftarkan passkey milik karyawan target (sidik jari ditempel di perangkatnya).
+ */
+export const enrollEmployeePasskey = async (employeeId, name) => {
+    const options = await requestEmployeeEnrollmentOptions(employeeId);
+
+    const publicKey = decodeCreationOptions(options);
+
+    let credential;
+    try {
+        credential = await navigator.credentials.create({ publicKey });
+    } catch (e) {
+        throw new Error(e?.name === 'NotAllowedError'
+            ? 'Pendaftaran dibatalkan atau waktu Windows Hello habis.'
+            : `Pendaftaran gagal: ${e?.message ?? e}`);
+    }
+
+    return jsonFetch(`/employees/${employeeId}/passkey`, {
+        method: 'POST',
+        body: { name, credential: credentialToJson(credential) },
+    });
+};
+
+/** Cabut passkey milik karyawan. */
+export const revokeEmployeePasskey = (passkeyId) =>
+    jsonFetch(`/employees/passkeys/${passkeyId}`, { method: 'DELETE' });
+
+/**
+ * Buat credential saat bootstrap (belum ada user login sama sekali).
+ *
+ * Endpoint bootstrap mengembalikan opsi registrasi langsung, jadi fungsi ini
+ * hanya menjalankan ceremony dan mengembalikan credential dalam bentuk JSON siap
+ * kirim — pemanggil yang mengirimkannya sendiri ke /bootstrap/passkey.
+ */
+export const bootstrapPublicKey = async (options) => {
+    const publicKey = decodeCreationOptions(options);
+
+    let credential;
+    try {
+        credential = await navigator.credentials.create({ publicKey });
+    } catch (e) {
+        throw new Error(e?.name === 'NotAllowedError'
+            ? 'Pendaftaran dibatalkan atau waktu Windows Hello habis.'
+            : `Pendaftaran gagal: ${e?.message ?? e}`);
+    }
+
+    return credentialToJson(credential);
+};
+
 /** Flatten a PublicKeyCredential into the base64url JSON the server expects. */
 const credentialToJson = (cred) => {
     const response = cred.response;
@@ -227,4 +296,14 @@ const credentialToJson = (cred) => {
     return json;
 };
 
-export default { detectSupport, registerPasskey, loginWithPasskey, confirmWithPasskey, deletePasskey };
+export default {
+    detectSupport,
+    registerPasskey,
+    loginWithPasskey,
+    confirmWithPasskey,
+    deletePasskey,
+    requestEmployeeEnrollmentOptions,
+    enrollEmployeePasskey,
+    revokeEmployeePasskey,
+    bootstrapPublicKey,
+};

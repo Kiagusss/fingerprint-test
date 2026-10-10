@@ -7,7 +7,7 @@
     <h1 class="text-xl font-semibold tracking-tight">Kelola Passkey</h1>
     <p class="mt-1 text-sm text-ink-500">
         Daftar passkey milik <span class="font-medium">{{ $user->username }}</span>.
-        Menambah atau mencabut passkey memerlukan konfirmasi ulang (Windows Hello) melalui middleware <code class="mono-val">password.confirm</code>.
+        Menambah atau mencabut passkey memerlukan konfirmasi ulang (Windows Hello) melalui middleware <code class="mono-val">passkey.confirm</code>.
     </p>
 </div>
 
@@ -112,7 +112,7 @@
         const name = document.getElementById('passkey-name').value.trim() || 'Passkey';
         btn.disabled = true;
 
-        // password.confirm returns 423 until the user re-verifies. Confirm with
+        // passkey.confirm returns 423 until the user re-verifies. Confirm with
         // Windows Hello, then retry the action exactly once.
         const withConfirmation = async (action) => {
             try {

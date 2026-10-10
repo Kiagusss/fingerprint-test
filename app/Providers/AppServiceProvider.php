@@ -48,7 +48,7 @@ class AppServiceProvider extends ServiceProvider
          * test-account roles, so a stray/leftover account cannot be used to sign in.
          */
         Passkeys::authorizeLoginUsing(
-            fn ($request, $user, $passkey): bool => $user->hasRole(Role::Admin, Role::Supervisor),
+            fn ($request, $user, $passkey): bool => $user->hasRole(Role::Admin, Role::Supervisor, Role::Employee),
         );
     }
 }

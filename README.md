@@ -38,6 +38,63 @@ Windows B, masing-masing memakai Chrome) mempertahankan **sesi Laravel yang terp
 
 ---
 
+## 2b. Mode Karyawan: Login Tanpa Email & Password (murni sidik jari)
+
+Tujuan: **karyawan tidak pernah tahu (dan tidak pernah diberi) password**. Satu-satunya
+jalur masuknya adalah sidik jari / Windows Hello. Yang berubah dari PoC awal:
+
+**Login sudah passwordless sejak awal.** Paket `laravel/passkeys` memanggil
+`GenerateVerificationOptions` tanpa user → `allowCredentials = []` → *discoverable
+credential*. Artinya server tidak meminta username sama sekali; Chrome yang memilih passkey
+dari sensor, server baru tahu pemiliknya setelah verifikasi. Form username/password lama
+hanya dipakai untuk *pendaftaran*, bukan untuk identitas.
+
+**Akun karyawan nol-kredensial.** `users.email` dan `users.password` kini NULL-able
+(migrasi `2026_10_10_170000_...`). Karyawan dibuat tanpa keduanya (role `employee`), dan
+`getPasskeyUsername()`/`getPasskeyDisplayName()` di model User jatuh ke `username`/`name`
+sehingga prompt Windows Hello tetap enak dibaca.
+
+**Alur enrollment (IT mendaftarkan sidik jari karyawan).** Endpoint bawaan paket selalu
+bekerja pada user yang *sedang login*, jadi admin tidak bisa memakainya. Karena itu ada
+`EmployeeEnrollmentController`:
+
+1. Admin (sudah punya passkey) membuat akun karyawan — tanpa password, tanpa email.
+2. Admin menekan "Daftarkan sidik jari" → sesi dikunci ke karyawan itu (`prepare`).
+   Tindakan ini di balik middleware `passkey.confirm` (konfirmasi ulang dengan sidik jari admin).
+3. Opsi registrasi diterbitkan **untuk karyawan** (`options`), lalu sidik jari karyawan
+   ditempel di perangkatnya.
+4. Passkey tersimpan sebagai milik **karyawan** (bukan admin). Ceremony divalidasi penuh
+   oleh validator paket — tidak ada kriptografi buatan sendiri.
+5. Karyawan masuk dengan sidik jarinya lewat tombol "Masuk dengan Windows Hello".
+
+**Bootstrap admin pertama (tanpa password).** Belum ada siapa pun yang bisa login saat
+instalasi baru. `/bootstrap` mengisi langkah itu: hanya bisa dipakai selama **belum ada user**,
+lalu menutup diri sendiri (404). Di luar environment `local` rute ini mensyaratkan `?key=`
+yang cocok dengan `BOOTSTRAP_KEY`; bila kunci kosong → gagal-tertutup.
+
+**Konfirmasi ulang tanpa password.** Middleware `password.confirm` diganti
+`app/Http/Middleware/EnsurePasskeyConfirmed.php` (alias `passkey.confirm`), dipasang sebagai
+`passkeys.management_middleware`. Ia memakai penanda sesi yang sama
+(`auth.password_confirmed_at`) yang di-set oleh `POST /passkeys/confirm`, sehingga endpoint
+paket tetap bekerja tanpa diubah. Khusus environment `local`, sesi terautentikasi boleh
+mengubah passkey tanpa konfirmasi (`PASSKEY_BOOTSTRAP_NO_CONFIRM`) — perlu karena Windows
+Hello tidak bisa berjalan pada origin http (`127.0.0.1:8099`), jika tidak, passkey pertama
+tidak akan pernah bisa didaftarkan.
+
+**Jalur pemulihan.** `AUTH_ENABLE_PASSWORD_LOGIN` default **false**: rute POST /login
+menolak dengan 404 dan form password tidak dirender. Saat semua passkey hilang, admin
+menyalakannya sementara, mereset via seeder, lalu mematikannya lagi.
+
+**Konsekuensi yang harus disadari.** Tanpa password, keamanan sepenuhnya bergantung pada
+(a) integritas passkey di perangkat (Windows Hello = TPM-bound) dan (b) **integritas proses
+enrollment** — endpoint enrollment wajib digerbangi; kalau tidak, siapa pun bisa menempelkan
+sidik jarinya sendiri ke akun orang lain. Pastikan passkey bersifat *device-bound* (tidak
+tersinkron ke akun Microsoft karyawan). Pemulihan identitas pengganti adalah proses manusia
+(IT menerbitkan pendaftaran ulang), bukan pemulihan mandiri. Karyawan yang resign → cabut
+passkey = akses mati total.
+
+---
+
 ## 3. Pemilihan Library WebAuthn (Tahap 2)
 
 **Dipilih: [`laravel/passkeys`](https://github.com/laravel/passkeys-server) v0.2.1** — paket resmi

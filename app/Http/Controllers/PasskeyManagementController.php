@@ -12,8 +12,8 @@ use Illuminate\View\View;
  * Passkey management page: lists the authenticated user's passkeys and renders
  * the "add passkey" control. Creating and deleting credentials happens through
  * laravel/passkeys' own endpoints (POST /user/passkeys, DELETE /user/passkeys/{id}),
- * both of which sit behind Laravel's password.confirm middleware so a Windows
- * Hello / password confirmation is required before the credential set changes.
+ * both of which sit behind the app's passkey.confirm middleware so a Windows
+ * Hello ceremony is required before the credential set changes.
  */
 class PasskeyManagementController extends Controller
 {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Services\TestLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,11 +29,17 @@ class LoginController extends Controller
     {
         return view('auth.login', [
             'hasPasskeys' => $this->anyPasskeysRegistered(),
+            'hasUsers' => User::query()->exists(),
+            'passwordEnabled' => (bool) config('auth.enable_password_login'),
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
+        // Pemulihan password dimatikan pada instalasi passwordless. Rutenya pun
+        // tidak terdaftar bila flag ini false; ini sabuk pengaman kedua.
+        abort_unless(config('auth.enable_password_login'), 404);
+
         $credentials = $request->validate([
             'username' => ['required', 'string', 'max:255'],
             'password' => ['required', 'string'],

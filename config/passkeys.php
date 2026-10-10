@@ -90,7 +90,7 @@ return [
     |
     */
 
-    'management_middleware' => ['password.confirm'],
+    'management_middleware' => ['passkey.confirm'],
 
     /*
     |--------------------------------------------------------------------------
@@ -102,6 +102,25 @@ return [
     */
 
     'throttle' => 'throttle:6,1',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Bootstrap Tanpa Konfirmasi (khusus lokal)
+    |--------------------------------------------------------------------------
+    |
+    | Menjalankan ceremony passkey memerlukan Windows Hello, dan Windows Hello
+    | memerlukan origin https (secure context). Pada mesin pengembang yang diuji
+    | lewat http://127.0.0.1:8099, ceremony tidak bisa berjalan sama sekali
+    | sehingga passkey pertama tidak akan pernah bisa didaftarkan.
+    |
+    | Bila true DAN environment aplikasi `local`, sesi yang sudah terautentikasi
+    | boleh mengubah passkey tanpa konfirmasi. Tidak berpengaruh di staging/
+    | produksi karena di sana aplikasi selalu https. Setel ke false untuk
+    | menutup jalur kenyamanan ini bahkan saat pengembangan.
+    |
+    */
+
+    'bootstrap_without_confirmation' => env('PASSKEY_BOOTSTRAP_NO_CONFIRM', true),
 
     /*
     |--------------------------------------------------------------------------

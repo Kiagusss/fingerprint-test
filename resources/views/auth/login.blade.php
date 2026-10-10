@@ -3,7 +3,7 @@
 @section('title', 'Masuk')
 
 @section('content')
-<div class="mx-auto grid max-w-4xl gap-5 lg:grid-cols-2">
+<div class="mx-auto grid max-w-4xl gap-5 {{ $passwordEnabled ? 'lg:grid-cols-2' : '' }}">
 
     <section class="card">
         <div class="card-header">
@@ -24,13 +24,23 @@
                     Browser ini tidak mendukung WebAuthn atau tidak berada pada secure context. Gunakan Chrome pada <code class="mono-val">https://hello-test.local</code>.
                 </p>
             @else
-                <p class="text-sm text-ink-500">
-                    Belum ada passkey terdaftar. Masuk dengan username &amp; password terlebih dahulu, lalu daftarkan passkey dari halaman <span class="font-medium">Passkey</span>.
-                </p>
+                @if($hasUsers)
+                    <p class="text-sm text-ink-500">
+                        Belum ada passkey terdaftar. Mintalah admin mendaftarkan sidik jari Anda dari halaman
+                        <span class="font-medium">Karyawan</span>, atau masuk dengan username &amp; password bila jalur pemulihan diaktifkan.
+                    </p>
+                @else
+                    <p class="text-sm text-ink-500">
+                        Instalasi ini belum punya akun apa pun. Daftarkan admin pertama dengan sidik jari —
+                        tanpa password.
+                    </p>
+                    <a href="{{ route('bootstrap.show') }}" class="btn-primary mt-3 w-full">Daftarkan admin pertama</a>
+                @endif
             @endif
         </div>
     </section>
 
+    @if($passwordEnabled)
     <section class="card">
         <div class="card-header">
             <h2 class="card-title">Masuk dengan Username &amp; Password</h2>
@@ -73,6 +83,7 @@
             </form>
         </div>
     </section>
+    @endif
 </div>
 
 <section class="card mt-5">

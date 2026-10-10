@@ -12,6 +12,7 @@ enum Role: string
 {
     case Admin = 'admin';
     case Supervisor = 'supervisor';
+    case Employee = 'employee';
     case User = 'user';
 
     public function label(): string
@@ -19,6 +20,7 @@ enum Role: string
         return match ($this) {
             self::Admin => 'Admin',
             self::Supervisor => 'Supervisor',
+            self::Employee => 'Karyawan',
             self::User => 'User',
         };
     }

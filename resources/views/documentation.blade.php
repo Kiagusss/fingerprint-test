@@ -120,7 +120,9 @@
             <li>Role ditegakkan server-side dari basis data; input role dari klien diabaikan.</li>
             <li>Rate limiting pada login password (<code class="mono-val">throttle:6,1</code>) dan endpoint passkey.</li>
             <li>CSRF aktif pada endpoint POST/PATCH/DELETE.</li>
-            <li>Pendaftaran/pencabutan passkey memerlukan konfirmasi ulang (<code class="mono-val">password.confirm</code>).</li>
+            <li>Pendaftaran/pencabutan passkey memerlukan konfirmasi ulang lewat ceremony passkey (<code class="mono-val">passkey.confirm</code>), bukan password.</li>
+            <li>Akun karyawan dibuat tanpa password dan tanpa email yang dapat dipakai; satu-satunya jalur masuk adalah passkey yang didaftarkan admin.</li>
+            <li>Bootstrap admin pertama hanya berfungsi selama belum ada user, lalu menutup diri sendiri. Di luar environment <code class="mono-val">local</code> wajib menyertakan <code class="mono-val">?key=</code> yang cocok dengan <code class="mono-val">BOOTSTRAP_KEY</code> (gagal-tertutup bila kosong).</li>
             <li>Log diagnostik tidak menyimpan private key, biometric, cookie, atau session id mentah (hanya fingerprint).</li>
         </ul>
     </div>

@@ -17,6 +17,15 @@ class AuthenticationTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Jalur pemulihan password nonaktif secara default pada instalasi
+        // passwordless. Aktifkan agar tes ini tetap menguji perilakunya.
+        config(['auth.enable_password_login' => true]);
+    }
+
     public function test_password_login_succeeds_and_regenerates_session(): void
     {
         $user = User::factory()->admin()->create(['username' => 'test-admin']);

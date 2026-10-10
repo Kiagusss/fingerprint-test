@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsurePasskeyConfirmed;
 use App\Http\Middleware\EnsureRole;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetLocale;
@@ -31,6 +32,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'role' => EnsureRole::class,
+            // Menggantikan password.confirm: akun passwordless membuktikan
+            // kepemilikan passkey lewat ceremony, bukan lewat password.
+            'passkey.confirm' => EnsurePasskeyConfirmed::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
