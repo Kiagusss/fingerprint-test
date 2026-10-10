@@ -403,6 +403,109 @@ def cmd_enroll(config: dict, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_probe(config: dict | None) -> int:
+    """Laporan kesiapan libfprint untuk jalur identifikasi 1:N.
+
+    Tidak menyentuh sidik jari: tidak enroll, verify, maupun identify. Hanya
+    melaporkan kemampuan perangkat dan tanda tangan fungsi yang harus dipakai
+    kode berikutnya.
+    """
+    lines: list[str] = []
+    add = lines.append
+
+    add("=== libfprint di mesin ini ===")
+
+    try:
+        import gi
+
+        add(f"  pygobject      : ada (gi {getattr(gi, '__version__', '?')})")
+        gi.require_version("FPrint", "2.0")
+        from gi.repository import FPrint
+    except Exception as error:  # noqa: BLE001 - laporan harus tetap jalan
+        add(f"  GAGAL memuat FPrint: {type(error).__name__}: {error}")
+        add("")
+        add("Pasang dulu:  sudo apt install python3-gi gir1.2-fprint-2.0")
+        print("\n".join(lines))
+
+        return 1
+
+    def attempt(label: str, fn):
+        try:
+            return fn()
+        except Exception as error:  # noqa: BLE001
+            add(f"      {label}: GAGAL -> {type(error).__name__}: {error}")
+            return None
+
+    add("  FPrint 2.0     : ada (versi "
+        + " ".join(str(getattr(FPrint, name, "?")) for name in ("MAJOR_VERSION", "MINOR_VERSION", "MICRO_VERSION"))
+        + ")")
+
+    add("")
+    add("=== perangkat ===")
+
+    devices = FPrint.Context().get_devices()
+
+    if not devices:
+        add("  tidak ada perangkat yang ditemukan libfprint")
+
+    for index, device in enumerate(devices):
+        add(f"  [{index}] {device.get_name()}")
+        add(f"      driver            : {device.get_driver()}")
+        add(f"      device_id         : {attempt('device_id', lambda: device.props.device_id)}")
+        add(f"      nr_enroll_stages  : {attempt('nr_enroll_stages', device.get_nr_enroll_stages)}")
+        add(f"      has_storage       : {attempt('has_storage', device.has_storage)}")
+        add(f"      supports_identify : {attempt('supports_identify', device.supports_identify)}")
+        add(f"      supports_capture  : {attempt('supports_capture', device.supports_capture)}")
+
+        def open_and_report() -> str:
+            device.open_sync()
+            try:
+                return f"terbuka, print tersimpan di perangkat: {len(device.list_prints_sync())}"
+            finally:
+                device.close_sync()
+
+        add(f"      uji buka perangkat : {attempt('open', open_and_report)}")
+
+    add("")
+    add("=== tanda tangan fungsi (salin apa adanya) ===")
+
+    for name, function in (
+        ("FPrint.Print.new", getattr(FPrint.Print, "new", None)),
+        ("FPrint.Print.serialize", getattr(FPrint.Print, "serialize", None)),
+        ("FPrint.Print.deserialize", getattr(FPrint.Print, "deserialize", None)),
+        ("FPrint.Print.set_finger", getattr(FPrint.Print, "set_finger", None)),
+        ("FPrint.Device.enroll_sync", getattr(FPrint.Device, "enroll_sync", None)),
+        ("FPrint.Device.identify_sync", getattr(FPrint.Device, "identify_sync", None)),
+        ("FPrint.Device.verify_sync", getattr(FPrint.Device, "verify_sync", None)),
+    ):
+        if function is None:
+            add(f"  {name}: TIDAK ADA di versi ini")
+            continue
+
+        doc = (function.__doc__ or "").strip().splitlines()
+        signature = next((line.strip() for line in doc if "(" in line and "->" in line), "")
+
+        add(f"  {name}: {signature or '(tanda tangan tidak terbaca)'}")
+
+    add("")
+    add("  anggota FPrint.Finger: " + ", ".join(sorted(
+        name for name in dir(FPrint.Finger) if name.isupper() and not name.startswith("_")
+    )))
+
+    add("")
+    add("=== penyimpanan fprintd (apakah template lama bisa dipakai ulang) ===")
+    add(f"  /var/lib/fprint: {'ada' if os.path.isdir('/var/lib/fprint') else 'tidak ada'}"
+        f" | bisa dibaca: {'ya' if os.access('/var/lib/fprint', os.R_OK) else 'tidak'}")
+    add("  (bisa dibaca 'tidak' itu normal: fprintd menyimpannya sebagai root)")
+
+    add("")
+    add("=== selesai. Kirim seluruh keluaran ini. ===")
+
+    print("\n".join(lines))
+
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Agen pemindai sidik jari login.heloklin.com (identifikasi, bukan autentikasi)."
@@ -419,6 +522,11 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("doctor", parents=[parent], help="periksa OS, pemindai, dan kredensial perangkat")
+    sub.add_parser(
+        "probe",
+        parents=[parent],
+        help="laporan kesiapan libfprint untuk identifikasi 1:N (tidak menyentuh jari)",
+    )
     sub.add_parser(
         "check",
         parents=[parent],
@@ -474,12 +582,15 @@ def main() -> int:
     args = build_parser().parse_args()
 
     try:
-        if args.command == "doctor":
-            # Doctor harus tetap berguna sebelum konfigurasi ada.
+        if args.command in {"doctor", "probe"}:
+            # Kedua perintah ini harus tetap berguna sebelum konfigurasi ada.
             try:
                 config: dict | None = load_config(args.config, args)
             except AgentError:
                 config = None
+
+            if args.command == "probe":
+                return cmd_probe(config)
 
             return cmd_doctor(config)
 

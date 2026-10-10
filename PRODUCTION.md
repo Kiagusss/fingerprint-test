@@ -228,6 +228,29 @@ halaman yang memakai view stale akan 500 dengan pesan
 `touch(): Utime failed: Operation not permitted`. Jalankan juga `php artisan
 view:cache` sebagai `sudo -u www` bila meng-compile cache manual di server.
 
+Peringatan yang sama berlaku DI LUAR deploy, dan ini pernah membuat situs 500
+di semua halaman ber-login:
+
+- **Jangan menjalankan suite tes sebagai `Heloklin`.** `vendor/bin/phpunit`
+  merender seluruh halaman, jadi ia menulis cache view. Dijalankan sebagai
+  `Heloklin`, sisa cache-nya milik `Heloklin`, dan situs 500 begitu ada file view
+  yang lebih baru — misalnya sesudah `git pull` atau `git rebase`, yang menulis
+  ulang semua file view dengan mtime baru. Pakai
+  `sudo -u www vendor/bin/phpunit`.
+- Gejalanya di `storage/logs/laravel.log`:
+  `production.ERROR: touch(): Utime failed: Operation not permitted` di
+  `BladeCompiler.php`, berulang untuk setiap halaman yang dibuka.
+- Pemulihannya:
+
+  ```bash
+  cd /www/wwwroot/login.heloklin.com/fingerprint-test
+  sudo -u www php artisan view:clear
+  sudo -u www php artisan view:cache
+  sudo chown -R www:www storage/framework/views
+  ```
+
+  Cek hasilnya dengan `ls -l storage/framework/views/` — semua harus milik `www`.
+
 Seeding akun/katalog kasus uji (idempoten, hanya bila memang diperlukan):
 
 ```bash
