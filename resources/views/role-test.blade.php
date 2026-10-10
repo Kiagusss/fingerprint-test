@@ -47,7 +47,7 @@
 
     <section class="card">
         <div class="card-header">
-            <h2 class="card-title">Passkey Akun Ini</h2>
+            <h2 class="card-title">Windows Hello Akun Ini</h2>
             <span class="badge-info">{{ $passkeys->count() }}</span>
         </div>
         <div class="card-body">
@@ -63,9 +63,9 @@
                     </div>
                 </div>
             @empty
-                <p class="text-sm text-ink-500">Belum ada passkey untuk akun ini.</p>
+                <p class="text-sm text-ink-500">Belum ada kredensial Windows Hello untuk akun ini.</p>
             @endforelse
-            <a href="{{ route('passkeys.index') }}" class="btn-secondary btn-sm mt-4">Kelola Passkey</a>
+            <a href="{{ route('passkeys.index') }}" class="btn-secondary btn-sm mt-4">Kelola Windows Hello</a>
         </div>
     </section>
 </div>

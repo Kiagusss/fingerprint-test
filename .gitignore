@@ -29,3 +29,7 @@ Thumbs.db
 # Local TLS material for the PoC (private keys must never be committed)
 /.certs
 /storage/app/junit.xml
+
+# Artefak Python dari agen pemindai sidik jari (bytecode, bukan sumber)
+__pycache__/
+*.pyc

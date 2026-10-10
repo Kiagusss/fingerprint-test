@@ -3,9 +3,13 @@
 namespace App\Providers;
 
 use App\Enums\Role;
+use App\Passkeys\WindowsHelloRegistrationOptions;
+use App\Passkeys\WindowsHelloVerificationOptions;
 use App\Services\AuthAttempt;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Passkeys\Actions\GenerateRegistrationOptions;
+use Laravel\Passkeys\Actions\GenerateVerificationOptions;
 use Laravel\Passkeys\Passkeys;
 
 class AppServiceProvider extends ServiceProvider
@@ -18,6 +22,30 @@ class AppServiceProvider extends ServiceProvider
         // Request-scoped: tells the generic login listener which ceremony
         // (password vs passkey) authenticated the user.
         $this->app->scoped(AuthAttempt::class);
+
+        /*
+         * Kebijakan "Windows Hello saja".
+         *
+         * Paket meminta authenticator apa pun (no-preference), sehingga karyawan
+         * bisa mendaftarkan ponsel lewat QR, security key USB, atau passkey yang
+         * disinkronkan ke akun Microsoft/Google — bukan perangkat kerjanya.
+         * Mengganti action ini membuat SEMUA endpoint pendaftaran (kelola
+         * kredensial sendiri, pendaftaran karyawan oleh admin, bootstrap admin
+         * pertama) hanya menerima authenticator platform bawaan perangkat.
+         *
+         * Controller paket maupun aplikasi menyelesaikan action ini lewat
+         * container, jadi satu binding ini menutup seluruh permukaan.
+         */
+        $this->app->bind(GenerateRegistrationOptions::class, WindowsHelloRegistrationOptions::class);
+
+        /*
+         * Sisi verifikasi (login passwordless + konfirmasi ulang) tidak punya
+         * `authenticatorAttachment` sama sekali, jadi UI-nya hanya bisa
+         * diarahkan lewat `hints: ['client-device']`. Tanpa ini, login
+         * discoverable selalu lebih dulu menampilkan pemilih "ponsel, tablet,
+         * atau security key" sebelum Windows Hello.
+         */
+        $this->app->bind(GenerateVerificationOptions::class, WindowsHelloVerificationOptions::class);
     }
 
     /**

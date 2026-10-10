@@ -7,13 +7,13 @@
 
     <section class="card">
         <div class="card-header">
-            <h2 class="card-title">Masuk dengan Passkey (Windows Hello)</h2>
+            <h2 class="card-title">Masuk dengan Windows Hello</h2>
             <span class="badge-info">utama</span>
         </div>
         <div class="card-body">
             @if($hasPasskeys)
                 <p class="mb-4 text-sm text-ink-500">
-                    Gunakan passkey yang sudah terdaftar. Kredensial ini tersimpan pada authenticator (Windows Hello) dan diverifikasi di server.
+                    Gunakan kredensial Windows Hello yang sudah terdaftar. Kredensial ini tersimpan di perangkat ini dan diverifikasi di server.
                 </p>
                 <button type="button" id="btn-passkey-login" class="btn-primary w-full disabled:opacity-50" style="display:none">
                     <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M6 21v-2a4 4 0 0 1 4-4h1"/></svg>
@@ -26,12 +26,12 @@
             @else
                 @if($hasUsers)
                     <p class="text-sm text-ink-500">
-                        Belum ada passkey terdaftar. Mintalah admin mendaftarkan sidik jari Anda dari halaman
+                        Belum ada kredensial Windows Hello terdaftar. Mintalah admin mendaftarkan Windows Hello Anda dari halaman
                         <span class="font-medium">Karyawan</span>, atau masuk dengan username &amp; password bila jalur pemulihan diaktifkan.
                     </p>
                 @else
                     <p class="text-sm text-ink-500">
-                        Instalasi ini belum punya akun apa pun. Daftarkan admin pertama dengan sidik jari —
+                        Instalasi ini belum punya akun apa pun. Daftarkan admin pertama dengan Windows Hello —
                         tanpa password.
                     </p>
                     <a href="{{ route('bootstrap.show') }}" class="btn-primary mt-3 w-full">Daftarkan admin pertama</a>
@@ -48,7 +48,7 @@
         </div>
         <div class="card-body">
             <p class="mb-4 text-sm text-ink-500">
-                Digunakan untuk setup awal dan pemulihan bila passkey hilang. Kebijakan keamanan passkey tidak dilemahkan oleh jalur ini.
+                Digunakan untuk setup awal dan pemulihan bila kredensial Windows Hello hilang. Kebijakan keamanan Windows Hello tidak dilemahkan oleh jalur ini.
             </p>
 
             <form method="POST" action="{{ route('login.store') }}" class="space-y-4">
@@ -125,7 +125,7 @@
                 show('Berhasil. Mengalihkan…', true);
                 window.location.assign(result?.redirect ?? '{{ route('dashboard') }}');
             } catch (e) {
-                show(e?.message ?? 'Login passkey gagal.', false);
+                show(e?.message ?? 'Login Windows Hello gagal.', false);
                 btn.disabled = false;
             }
         });

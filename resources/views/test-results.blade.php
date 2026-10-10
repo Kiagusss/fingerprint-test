@@ -129,17 +129,17 @@
             <li>Login ke <strong>Windows A</strong>.</li>
             <li>Buka Chrome pada profil Windows A.</li>
             <li>Login sebagai <code class="mono-val">test-admin</code>.</li>
-            <li>Daftarkan passkey melalui Windows Hello (halaman Passkey).</li>
+            <li>Daftarkan kredensial Windows Hello pada halaman Windows Hello.</li>
             <li>Buka <strong>Admin Test</strong> dan verifikasi identitas.</li>
-            <li>Logout untuk menguji login passkey.</li>
+            <li>Logout untuk menguji login Windows Hello.</li>
             <li>Beralih ke <strong>Windows B</strong>.</li>
             <li>Buka Chrome pada profil Windows B.</li>
             <li>Login sebagai <code class="mono-val">test-supervisor</code>.</li>
-            <li>Daftarkan passkey melalui Windows Hello.</li>
+            <li>Daftarkan kredensial Windows Hello.</li>
             <li>Buka <strong>Supervisor Test</strong>.</li>
             <li>Beralih kembali ke Windows A — pastikan sesi Admin tetap terpisah.</li>
             <li>Beralih kembali ke Windows B — pastikan sesi Supervisor tetap terpisah.</li>
-            <li>Uji logout, sesi kedaluwarsa, restart browser, dan pencabutan passkey.</li>
+            <li>Uji logout, sesi kedaluwarsa, restart browser, dan pencabutan kredensial.</li>
         </ol>
         <p class="mt-3 text-xs text-ink-400">
             Pergantian akun Windows <strong>tidak</strong> otomatis menghapus atau mengganti sesi Laravel. Sesi mengikuti cookie pada profil browser.

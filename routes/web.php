@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\BiometricDeviceManagementController;
 use App\Http\Controllers\BootstrapController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentationController;
@@ -104,7 +105,7 @@ Route::middleware('auth:web')->group(function () {
     Route::get('/password/confirm', function () {
         return redirect()->route('passkeys.index')->with(
             'status',
-            'Konfirmasi ulang diperlukan. Tekan "Tambah passkey" untuk memverifikasi dengan Windows Hello.',
+            'Konfirmasi ulang diperlukan. Tekan "Tambah Windows Hello" untuk memverifikasi di perangkat ini.',
         );
     })->name('password.confirm');
 
@@ -121,6 +122,20 @@ Route::middleware('auth:web')->group(function () {
     // Test results board.
     Route::get('/test-results', [TestResultsController::class, 'index'])->name('test-results.index');
     Route::patch('/test-results/{testResult}', [TestResultsController::class, 'update'])->name('test-results.update');
+
+    /*
+     * Perangkat sidik jari + pendaftaran jari.
+     *
+     * Hanya admin. Halaman ini mengelola AGEN di PC bersama; ia tidak membuat
+     * sesi dari sidik jari. Endpoint yang dipakai agen ada di routes/api.php
+     * dan memakai autentikasi per perangkat, bukan sesi browser.
+     */
+    Route::middleware('role:admin')->prefix('biometric-devices')->name('biometric.')->group(function () {
+        Route::get('/', [BiometricDeviceManagementController::class, 'index'])->name('index');
+        Route::post('/', [BiometricDeviceManagementController::class, 'store'])->name('store');
+        Route::patch('/{device}', [BiometricDeviceManagementController::class, 'toggle'])->name('toggle');
+        Route::post('/enrollments/{enrollment}', [BiometricDeviceManagementController::class, 'revoke'])->name('revoke');
+    });
 
     // Configuration documentation / runbook.
     Route::get('/documentation', [DocumentationController::class, 'index'])->name('documentation');

@@ -17,7 +17,9 @@ use Illuminate\Support\Str;
  *   - private keys, public keys or raw credential payloads
  *   - raw challenges
  *   - raw session ids / cookies (only a truncated SHA-256 fingerprint)
- *   - biometric data (which the server never receives in the first place)
+ *   - biometric templates or images (a template may exist encrypted in
+ *     `biometric_enrollments`, but it is never copied here — only its
+ *     non-reversible fingerprint, like any other credential id)
  */
 class TestLogger
 {
@@ -37,6 +39,9 @@ class TestLogger
         'employee_passkey_enrolled',
         'employee_passkey_revoked',
         'bootstrap_passkey_enrolled',
+        'biometric_device_created',
+        'biometric_enrolled',
+        'biometric_enrollment_revoked',
     ];
 
     public function log(string $event, array $context = []): TestLog

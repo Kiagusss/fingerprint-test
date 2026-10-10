@@ -158,8 +158,8 @@ export const loginWithPasskey = async () => {
         assertion = await navigator.credentials.get({ publicKey });
     } catch (e) {
         throw new Error(e?.name === 'NotAllowedError'
-            ? 'Login passkey dibatalkan atau waktu habis.'
-            : `Login passkey gagal: ${e?.message ?? e}`);
+            ? 'Login Windows Hello dibatalkan atau waktu habis.'
+            : `Login Windows Hello gagal: ${e?.message ?? e}`);
     }
 
     return jsonFetch('/passkeys/login', {

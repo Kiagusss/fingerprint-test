@@ -48,6 +48,7 @@ class PageSmokeTest extends TestCase
         $this->actingAs($admin)->get(route('dashboard'))->assertOk();
         $this->actingAs($admin)->get(route('passkeys.index'))->assertOk();
         $this->actingAs($admin)->get(route('admin.test'))->assertOk();
+        $this->actingAs($admin)->get(route('biometric.index'))->assertOk();
         $this->actingAs($admin)->get(route('test-results.index'))->assertOk();
         $this->actingAs($admin)->get(route('documentation'))->assertOk();
         $this->actingAs($admin)->get(route('landing'))->assertOk();
@@ -108,7 +109,7 @@ class PageSmokeTest extends TestCase
             ->assertSee('NOT TESTED');
 
         $this->assertSame(
-            9,
+            10,
             TestResult::query()->where('source', 'manual')->where('status', 'not_tested')->count()
         );
     }

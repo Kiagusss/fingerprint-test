@@ -3,17 +3,17 @@
         'Login ke Windows A.',
         'Buka Chrome pada profil Windows A.',
         'Login sebagai test-admin (username + password).',
-        'Daftarkan passkey melalui Windows Hello pada halaman Passkey.',
+        'Daftarkan kredensial Windows Hello pada halaman Windows Hello.',
         'Buka halaman Admin Test dan verifikasi identitas.',
-        'Logout untuk menguji login passkey.',
+        'Logout untuk menguji login Windows Hello.',
         'Beralih ke Windows B.',
         'Buka Chrome pada profil Windows B.',
         'Login sebagai test-supervisor.',
-        'Daftarkan passkey melalui Windows Hello.',
+        'Daftarkan kredensial Windows Hello.',
         'Buka halaman Supervisor Test.',
         'Beralih kembali ke Windows A — periksa sesi Admin tetap terpisah.',
         'Beralih kembali ke Windows B — periksa sesi Supervisor tetap terpisah.',
-        'Uji logout, sesi kedaluwarsa, restart browser, dan pencabutan passkey.',
+        'Uji logout, sesi kedaluwarsa, restart browser, dan pencabutan kredensial.',
     ];
 @endphp
 

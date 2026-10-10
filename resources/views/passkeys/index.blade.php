@@ -1,20 +1,20 @@
 @extends('layouts.app')
 
-@section('title', 'Kelola Passkey')
+@section('title', 'Kelola Windows Hello')
 
 @section('content')
 <div class="mb-6">
-    <h1 class="text-xl font-semibold tracking-tight">Kelola Passkey</h1>
+    <h1 class="text-xl font-semibold tracking-tight">Kelola Windows Hello</h1>
     <p class="mt-1 text-sm text-ink-500">
-        Daftar passkey milik <span class="font-medium">{{ $user->username }}</span>.
-        Menambah atau mencabut passkey memerlukan konfirmasi ulang (Windows Hello) melalui middleware <code class="mono-val">passkey.confirm</code>.
+        Daftar kredensial Windows Hello milik <span class="font-medium">{{ $user->username }}</span>.
+        Menambah atau mencabut kredensial memerlukan konfirmasi ulang Windows Hello melalui middleware <code class="mono-val">passkey.confirm</code>.
     </p>
 </div>
 
 <div class="grid gap-5 lg:grid-cols-3">
     <section class="card lg:col-span-2">
         <div class="card-header">
-            <h2 class="card-title">Passkey Terdaftar</h2>
+            <h2 class="card-title">Windows Hello Terdaftar</h2>
             <span class="badge-info">{{ $passkeys->count() }}</span>
         </div>
         <div class="overflow-x-auto">
@@ -44,7 +44,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="text-center text-ink-400">Belum ada passkey untuk akun ini.</td></tr>
+                        <tr><td colspan="6" class="text-center text-ink-400">Belum ada kredensial Windows Hello untuk akun ini.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -55,15 +55,15 @@
     </section>
 
     <section class="card">
-        <div class="card-header"><h2 class="card-title">Tambah Passkey</h2></div>
+        <div class="card-header"><h2 class="card-title">Tambah Windows Hello</h2></div>
         <div class="card-body">
             <p class="mb-4 text-sm text-ink-500">
-                Daftarkan passkey baru untuk akun ini. Nama membantu membedakan perangkat/akun Windows.
+                Daftarkan kredensial Windows Hello baru untuk akun ini. Nama membantu membedakan perangkat/akun Windows.
             </p>
 
             <form id="form-add-passkey" class="space-y-4">
                 <div>
-                    <label class="label" for="passkey-name">Nama passkey</label>
+                    <label class="label" for="passkey-name">Nama kredensial</label>
                     <input class="input" id="passkey-name" name="name" type="text" maxlength="255"
                            placeholder="Windows A - test-admin" required>
                 </div>
@@ -78,7 +78,7 @@
             <div class="mt-5 space-y-2 rounded-md border border-ink-200 bg-ink-50 p-3 text-xs text-ink-500">
                 <p><strong class="text-ink-600">Konfirmasi:</strong> bila diminta, verifikasi ulang dengan Windows Hello terlebih dahulu (menggantikan prompt password).</p>
                 <p><strong class="text-ink-600">Exclude credentials:</strong> authenticator yang sama tidak dapat didaftarkan dua kali.</p>
-                <p><strong class="text-ink-600">Resident key</strong> dan <strong class="text-ink-600">user verification</strong> diwajibkan agar passkey dapat dipakai tanpa mengetik username.</p>
+                <p><strong class="text-ink-600">Resident key</strong> dan <strong class="text-ink-600">user verification</strong> diwajibkan agar kredensial dapat dipakai tanpa mengetik username.</p>
             </div>
         </div>
     </section>
@@ -109,7 +109,7 @@
     document.getElementById('form-add-passkey').addEventListener('submit', async (ev) => {
         ev.preventDefault();
 
-        const name = document.getElementById('passkey-name').value.trim() || 'Passkey';
+        const name = document.getElementById('passkey-name').value.trim() || 'Windows Hello';
         btn.disabled = true;
 
         // passkey.confirm returns 423 until the user re-verifies. Confirm with
@@ -127,10 +127,10 @@
 
         try {
             await withConfirmation(() => registerPasskey(name));
-            show('Passkey berhasil didaftarkan. Memuat ulang…', true);
+            show('Windows Hello berhasil didaftarkan. Memuat ulang…', true);
             setTimeout(() => window.location.reload(), 900);
         } catch (e) {
-            show(e?.message ?? 'Pendaftaran passkey gagal.', false);
+            show(e?.message ?? 'Pendaftaran Windows Hello gagal.', false);
             btn.disabled = false;
         }
     });
@@ -138,7 +138,7 @@
     document.querySelectorAll('[data-delete]').forEach((button) => {
         button.addEventListener('click', async () => {
             const id = button.getAttribute('data-delete');
-            if (!window.confirm('Cabut passkey ini? Tindakan ini tidak dapat dibatalkan.')) return;
+            if (!window.confirm('Cabut kredensial Windows Hello ini? Tindakan ini tidak dapat dibatalkan.')) return;
 
             button.disabled = true;
             try {
@@ -151,7 +151,7 @@
                     await window.helloTestPasskeys.confirmWithPasskey();
                     result = await deletePasskey(id);
                 }
-                show('Passkey dicabut. Memuat ulang…', true);
+                show('Windows Hello dicabut. Memuat ulang…', true);
                 setTimeout(() => window.location.reload(), 900);
             } catch (e) {
                 show(e?.message ?? 'Pencabutan gagal.', false);

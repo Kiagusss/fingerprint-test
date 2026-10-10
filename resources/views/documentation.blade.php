@@ -41,10 +41,10 @@
     <div class="card-header"><h2 class="card-title">2. Dua Mode Identitas Windows</h2></div>
     <div class="card-body space-y-4">
         <div>
-            <h3 class="text-sm font-semibold">Mode A — Passkey &amp; sesi per profil Windows (didukung)</h3>
+            <h3 class="text-sm font-semibold">Mode A — Windows Hello &amp; sesi per profil Windows (didukung)</h3>
             <p class="mt-1 text-sm text-ink-600">
-                Pengguna login/passkey di tiap profil Windows. Chrome mempertahankan sesi masing-masing selama cookie dan session store terpisah.
-                Server mengetahui <em>akun aplikasi</em> pemilik passkey, bukan nama akun Windows.
+                Pengguna login dengan Windows Hello di tiap profil Windows. Chrome mempertahankan sesi masing-masing selama cookie dan session store terpisah.
+                Server mengetahui <em>akun aplikasi</em> pemilik kredensial, bukan nama akun Windows.
             </p>
             <ul class="mt-2 list-inside list-disc text-sm text-ink-600">
                 <li>Identitas = akun aplikasi (username + role di basis data).</li>
@@ -78,7 +78,7 @@
             <ul class="mt-1 list-inside list-disc space-y-0.5">
                 <li>RP ID = hostname (tanpa skema/port), mis. <code class="mono-val">hello-test.local</code>.</li>
                 <li>Origin yang diizinkan harus tepat sama dengan yang dilaporkan browser.</li>
-                <li>Passkey terikat pada RP ID. Berganti hostname = passkey lama tidak valid.</li>
+                <li>Kredensial terikat pada RP ID. Berganti hostname = kredensial lama tidak valid.</li>
             </ul>
         </div>
     </div>
@@ -118,10 +118,10 @@
             <li>User verification diwajibkan (Windows Hello biometrik/PIN).</li>
             <li>Session ID di-regenerate setelah login dan di-invalidate saat logout.</li>
             <li>Role ditegakkan server-side dari basis data; input role dari klien diabaikan.</li>
-            <li>Rate limiting pada login password (<code class="mono-val">throttle:6,1</code>) dan endpoint passkey.</li>
+            <li>Rate limiting pada login password (<code class="mono-val">throttle:6,1</code>) dan endpoint Windows Hello.</li>
             <li>CSRF aktif pada endpoint POST/PATCH/DELETE.</li>
-            <li>Pendaftaran/pencabutan passkey memerlukan konfirmasi ulang lewat ceremony passkey (<code class="mono-val">passkey.confirm</code>), bukan password.</li>
-            <li>Akun karyawan dibuat tanpa password dan tanpa email yang dapat dipakai; satu-satunya jalur masuk adalah passkey yang didaftarkan admin.</li>
+            <li>Pendaftaran/pencabutan kredensial memerlukan konfirmasi ulang lewat ceremony Windows Hello (<code class="mono-val">passkey.confirm</code>), bukan password.</li>
+            <li>Akun karyawan dibuat tanpa password dan tanpa email yang dapat dipakai; satu-satunya jalur masuk adalah kredensial Windows Hello yang didaftarkan admin.</li>
             <li>Bootstrap admin pertama hanya berfungsi selama belum ada user, lalu menutup diri sendiri. Di luar environment <code class="mono-val">local</code> wajib menyertakan <code class="mono-val">?key=</code> yang cocok dengan <code class="mono-val">BOOTSTRAP_KEY</code> (gagal-tertutup bila kosong).</li>
             <li>Log diagnostik tidak menyimpan private key, biometric, cookie, atau session id mentah (hanya fingerprint).</li>
         </ul>

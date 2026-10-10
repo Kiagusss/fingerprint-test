@@ -22,7 +22,7 @@
         <p class="mt-1 text-sm text-ink-500">Identitas akun, status sesi, dan aktivitas autentikasi terbaru.</p>
     </div>
     <div class="flex flex-wrap gap-2">
-        <a href="{{ route('passkeys.index') }}" class="btn-secondary btn-sm">Kelola Passkey</a>
+        <a href="{{ route('passkeys.index') }}" class="btn-secondary btn-sm">Kelola Windows Hello</a>
         <a href="{{ route('test-results.index') }}" class="btn-secondary btn-sm">Hasil Pengujian</a>
     </div>
 </div>
@@ -68,7 +68,7 @@
                 <dt>Metode terakhir</dt>
                 <dd class="mono-val">{{ $user->last_auth_method ?? '—' }}</dd>
 
-                <dt>Passkey terdaftar</dt>
+                <dt>Windows Hello terdaftar</dt>
                 <dd>{{ $passkeys->count() }} kredensial</dd>
 
                 <dt>Session driver</dt>
@@ -114,7 +114,7 @@
     </div>
 
     <div class="card">
-        <div class="card-header"><h2 class="card-title">Passkey Akun Ini</h2></div>
+        <div class="card-header"><h2 class="card-title">Windows Hello Akun Ini</h2></div>
         <div class="card-body">
             @forelse($passkeys as $passkey)
                 <div class="flex items-center justify-between gap-3 border-b border-ink-100 py-2 last:border-0">
@@ -127,7 +127,7 @@
                     </div>
                 </div>
             @empty
-                <p class="text-sm text-ink-500">Belum ada passkey. Tambahkan dari halaman Kelola Passkey.</p>
+                <p class="text-sm text-ink-500">Belum ada kredensial Windows Hello. Tambahkan dari halaman Kelola Windows Hello.</p>
             @endforelse
         </div>
     </div>

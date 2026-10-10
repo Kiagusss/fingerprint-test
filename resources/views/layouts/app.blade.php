@@ -21,7 +21,10 @@
 
                 @auth
                     <a href="{{ route('dashboard') }}" class="rounded px-2.5 py-1.5 {{ request()->routeIs('dashboard') ? 'bg-ink-100 font-medium text-ink-900' : 'text-ink-600 hover:bg-ink-100' }}">Dashboard</a>
-                    <a href="{{ route('passkeys.index') }}" class="rounded px-2.5 py-1.5 {{ request()->routeIs('passkeys.*') ? 'bg-ink-100 font-medium text-ink-900' : 'text-ink-600 hover:bg-ink-100' }}">Passkey</a>
+                    <a href="{{ route('passkeys.index') }}" class="rounded px-2.5 py-1.5 {{ request()->routeIs('passkeys.*') ? 'bg-ink-100 font-medium text-ink-900' : 'text-ink-600 hover:bg-ink-100' }}">Windows Hello</a>
+                    @if(auth()->user()?->isAdmin())
+                        <a href="{{ route('biometric.index') }}" class="rounded px-2.5 py-1.5 {{ request()->routeIs('biometric.*') ? 'bg-ink-100 font-medium text-ink-900' : 'text-ink-600 hover:bg-ink-100' }}">Sidik Jari</a>
+                    @endif
                     <a href="{{ route('test-results.index') }}" class="rounded px-2.5 py-1.5 {{ request()->routeIs('test-results.*') ? 'bg-ink-100 font-medium text-ink-900' : 'text-ink-600 hover:bg-ink-100' }}">Hasil Pengujian</a>
                     <a href="{{ route('documentation') }}" class="rounded px-2.5 py-1.5 {{ request()->routeIs('documentation') ? 'bg-ink-100 font-medium text-ink-900' : 'text-ink-600 hover:bg-ink-100' }}">Dokumentasi</a>
 

@@ -42,7 +42,7 @@ class EnsurePasskeyConfirmed
             return $next($request);
         }
 
-        $message = 'Konfirmasi ulang dengan sidik jari (Windows Hello) diperlukan.';
+        $message = 'Konfirmasi ulang dengan Windows Hello diperlukan.';
 
         return $request->expectsJson()
             ? response()->json(['message' => $message], 423)

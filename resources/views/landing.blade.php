@@ -11,7 +11,7 @@
 <div class="mb-6">
     <h1 class="text-xl font-semibold tracking-tight">Beranda Diagnostik</h1>
     <p class="mt-1 text-sm text-ink-500">
-        Status koneksi HTTPS, dukungan WebAuthn browser, sesi Laravel, identitas akun, dan pendaftaran passkey.
+        Status koneksi HTTPS, dukungan WebAuthn browser, sesi Laravel, identitas akun, dan pendaftaran Windows Hello.
     </p>
 </div>
 
@@ -104,7 +104,7 @@
                     <dt>Metode autentikasi terakhir</dt>
                     <dd class="mono-val">{{ $user->last_auth_method ?? '—' }}</dd>
 
-                    <dt>Passkey terdaftar</dt>
+                    <dt>Windows Hello terdaftar</dt>
                     <dd>{{ $passkeys->count() }} kredensial</dd>
 
                     @if($osAccountLabel)
@@ -115,10 +115,10 @@
                 </dl>
                 <div class="mt-4 flex flex-wrap gap-2">
                     <a href="{{ route('dashboard') }}" class="btn-primary btn-sm">Ke Dashboard</a>
-                    <a href="{{ route('passkeys.index') }}" class="btn-secondary btn-sm">Kelola Passkey</a>
+                    <a href="{{ route('passkeys.index') }}" class="btn-secondary btn-sm">Kelola Windows Hello</a>
                 </div>
             @else
-                <p class="text-sm text-ink-500">Belum ada sesi terautentikasi. Masuk dengan password (setup awal) atau passkey bila sudah terdaftar.</p>
+                <p class="text-sm text-ink-500">Belum ada sesi terautentikasi. Masuk dengan password (setup awal) atau Windows Hello bila sudah terdaftar.</p>
                 <div class="mt-4 flex flex-wrap gap-2">
                     <a href="{{ route('login') }}" class="btn-primary btn-sm">Masuk</a>
                 </div>
@@ -162,11 +162,11 @@
         <div class="rounded-md border border-emerald-200 bg-emerald-50/50 p-4">
             <div class="flex items-center gap-2">
                 <span class="badge-pass">Mode A — didukung penuh</span>
-                <span class="text-sm font-medium">Passkey &amp; sesi per profil Windows</span>
+                <span class="text-sm font-medium">Windows Hello &amp; sesi per profil Windows</span>
             </div>
             <p class="mt-2 text-sm text-ink-600">
-                Login/passkey dilakukan di tiap profil Windows. Chrome mempertahankan sesi masing-masing selama cookie dan session store terpisah.
-                Identitas yang diketahui server adalah akun aplikasi pemilik passkey — <strong>bukan</strong> nama akun Windows.
+                Login Windows Hello dilakukan di tiap profil Windows. Chrome mempertahankan sesi masing-masing selama cookie dan session store terpisah.
+                Identitas yang diketahui server adalah akun aplikasi pemilik kredensial — <strong>bukan</strong> nama akun Windows.
             </p>
         </div>
         <div class="rounded-md border border-amber-200 bg-amber-50/50 p-4">

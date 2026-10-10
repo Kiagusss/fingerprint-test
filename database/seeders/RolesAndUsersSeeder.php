@@ -30,9 +30,9 @@ class RolesAndUsersSeeder extends Seeder
     public function run(): void
     {
         $this->seedAccount(
-            username: 'test-admin',
+            username: 'admin',
             name: 'Test Admin',
-            email: 'test-admin@hello-test.local',
+            email: 'admin@hello-test.local',
             role: Role::Admin,
             envKey: 'TEST_ADMIN_PASSWORD',
         );

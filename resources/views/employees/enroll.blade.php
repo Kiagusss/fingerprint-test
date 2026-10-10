@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Pendaftaran Sidik Jari Karyawan')
+@section('title', 'Pendaftaran Windows Hello Karyawan')
 
 @section('content')
 @php
@@ -8,10 +8,10 @@
 @endphp
 
 <div class="mb-6">
-    <h1 class="text-xl font-semibold tracking-tight">Pendaftaran Sidik Jari Karyawan</h1>
+    <h1 class="text-xl font-semibold tracking-tight">Pendaftaran Windows Hello Karyawan</h1>
     <p class="mt-1 text-sm text-ink-500">
-        Karyawan masuk dengan sidik jari (Windows Hello) dan <strong>tidak pernah menerima password</strong>.
-        Anda (admin) yang mendaftarkan akun sekaligus sidik jarinya — karyawan tidak perlu tahu kredensial apa pun.
+        Karyawan masuk dengan Windows Hello dan <strong>tidak pernah menerima password</strong>.
+        Anda (admin) yang mendaftarkan akun sekaligus kredensial Windows Hello-nya — karyawan tidak perlu tahu kredensial apa pun.
     </p>
 </div>
 
@@ -24,18 +24,18 @@
         </div>
         <div class="card-body">
             <p class="text-sm text-ink-600">
-                Sekarang tempelkan <strong>sidik jari karyawan</strong> pada sensor di perangkatnya.
-                Pastikan yang menempel bukan sidik jari Anda.
+                Sekarang karyawan memverifikasi <strong>Windows Hello di perangkatnya sendiri</strong>.
+                Pastikan yang memverifikasi adalah karyawan itu, bukan Anda.
             </p>
 
             <form id="form-enroll" class="mt-4 flex flex-wrap items-end gap-3">
                 <div class="grow">
-                    <label class="label" for="enroll-name">Nama passkey</label>
+                    <label class="label" for="enroll-name">Nama kredensial</label>
                     <input class="input" id="enroll-name" name="name" type="text" maxlength="255"
                            value="Windows Hello — {{ $pending->username }}">
                 </div>
                 <button type="submit" id="btn-enroll" class="btn-primary">
-                    Daftarkan sidik jari sekarang
+                    Daftarkan Windows Hello sekarang
                 </button>
             </form>
 
@@ -61,7 +61,7 @@
                     <tr>
                         <th>Username</th>
                         <th>Nama</th>
-                        <th>Passkey</th>
+                        <th>Windows Hello</th>
                         <th class="w-40"></th>
                     </tr>
                 </thead>
@@ -81,7 +81,7 @@
                                 <form method="POST" action="{{ route('employees.prepare', $employee) }}" class="inline">
                                     @csrf
                                     <button type="submit" class="btn-primary btn-sm">
-                                        {{ $employee->passkeys->isEmpty() ? 'Daftarkan sidik jari' : 'Tambah passkey' }}
+                                        {{ $employee->passkeys->isEmpty() ? 'Daftarkan Windows Hello' : 'Tambah kredensial' }}
                                     </button>
                                 </form>
                                 @foreach($employee->passkeys as $passkey)
@@ -98,7 +98,7 @@
             </table>
         </div>
         <div class="card-body border-t border-ink-200 text-xs text-ink-400">
-            Akun karyawan dibuat tanpa password dan tanpa email yang dapat dipakai. Satu-satunya cara masuk adalah passkey yang didaftarkan di sini.
+            Akun karyawan dibuat tanpa password dan tanpa email yang dapat dipakai. Satu-satunya cara masuk adalah kredensial Windows Hello yang didaftarkan di sini.
         </div>
     </section>
 
@@ -125,7 +125,7 @@
             </form>
 
             <div class="mt-5 space-y-2 rounded-md border border-ink-200 bg-ink-50 p-3 text-xs text-ink-500">
-                <p><strong class="text-ink-600">Cara kerja:</strong> buat akun → kunci sesi ke karyawan itu → tempelkan sidik jarinya → passkey tersimpan sebagai milik karyawan, bukan milik Anda.</p>
+                <p><strong class="text-ink-600">Cara kerja:</strong> buat akun → kunci sesi ke karyawan itu → karyawan memverifikasi Windows Hello → kredensial tersimpan sebagai milik karyawan, bukan milik Anda.</p>
                 <p><strong class="text-ink-600">Resident key</strong> diwajibkan sehingga karyawan bisa masuk tanpa mengetik username.</p>
                 <p><strong class="text-ink-600">Otorisasi:</strong> target selalu diambil dari database, bukan dari data yang dikirim browser.</p>
             </div>
@@ -162,7 +162,7 @@
             return await action();
         } catch (e) {
             if (e?.status !== 423) throw e;
-            show('Perlu konfirmasi ulang — verifikasi sidik jari Anda…', true);
+            show('Perlu konfirmasi ulang — verifikasi Windows Hello Anda…', true);
             await window.helloTestPasskeys.confirmWithPasskey();
             return action();
         }
@@ -177,10 +177,10 @@
 
             try {
                 await withConfirmation(() => window.helloTestPasskeys.enrollEmployeePasskey(targetId, name));
-                show('Sidik jari karyawan tersimpan. Memuat ulang…', true);
+                show('Windows Hello karyawan tersimpan. Memuat ulang…', true);
                 setTimeout(() => window.location.reload(), 900);
             } catch (e) {
-                show(e?.message ?? 'Pendaftaran sidik jari gagal.', false);
+                show(e?.message ?? 'Pendaftaran Windows Hello gagal.', false);
                 btn.disabled = false;
             }
         });
@@ -188,14 +188,14 @@
 
     document.querySelectorAll('[data-revoke]').forEach((button) => {
         button.addEventListener('click', async () => {
-            if (!window.confirm('Cabut passkey karyawan ini? Akses karyawan akan hilang sampai didaftarkan ulang.')) return;
+            if (!window.confirm('Cabut kredensial Windows Hello karyawan ini? Akses karyawan akan hilang sampai didaftarkan ulang.')) return;
 
             const id = button.getAttribute('data-revoke');
             button.disabled = true;
 
             try {
                 await withConfirmation(() => window.helloTestPasskeys.revokeEmployeePasskey(id));
-                show('Passkey dicabut. Memuat ulang…', true);
+                show('Windows Hello dicabut. Memuat ulang…', true);
                 setTimeout(() => window.location.reload(), 900);
             } catch (e) {
                 show(e?.message ?? 'Pencabutan gagal.', false);

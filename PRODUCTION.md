@@ -25,7 +25,7 @@ commit hardening produksi; lihat §9 untuk cara kembali ke versi sebelumnya.
 Kredensial (0600, hanya di server, tidak pernah di repo):
 
 - `/home/Heloklin/login-heloklin-db-credentials.txt` — user + password database
-- `/home/Heloklin/login-heloklin-account-credentials.txt` — password `test-admin` dan `test-supervisor`
+- `/home/Heloklin/login-heloklin-account-credentials.txt` — password `admin` dan `test-supervisor`
 - `.env` aplikasi (mode 640, `Heloklin:www`)
 
 ## 2. DNS & TLS
@@ -136,10 +136,10 @@ dari server. Urutan yang dipakai sekarang:
 
 1. `.env` saat ini: `AUTH_ENABLE_PASSWORD_LOGIN=true` → akun uji masih bisa masuk
    sebagai jalur pemulihan, situs tetap dapat dikelola sebelum ada passkey.
-2. Buka `https://login.heloklin.com/login`, masuk sebagai `test-admin`
+2. Buka `https://login.heloklin.com/login`, masuk sebagai `admin`
    (password di `/home/Heloklin/login-heloklin-account-credentials.txt`), lalu
-   buka `/passkeys` → **Tambah passkey** → tempelkan sidik jari admin di
-   perangkat itu. Konfirmasi Windows Hello akan diminta sekali lagi untuk
+   buka `/passkeys` → **Tambah Windows Hello** → verifikasi Windows Hello admin
+   di perangkat itu. Konfirmasi Windows Hello akan diminta sekali lagi untuk
    menyimpan.
 3. Daftarkan karyawan di `/employees` dengan cara yang sama.
 4. Setelah passkey admin ada, tutup jalur password:
@@ -157,6 +157,55 @@ dari server. Urutan yang dipakai sekarang:
 Bila suatu saat ingin instalasi benar-benar bersih (tanpa akun uji sama sekali),
 kosongkan tabel `users` lalu setel `BOOTSTRAP_KEY=<acak>` dan buka
 `https://login.heloklin.com/bootstrap?key=<acak>` dari perangkat karyawan+admin.
+
+### 4c. Prasyarat di perangkat klien (Windows Hello)
+
+Aplikasi hanya bisa meminta "authenticator platform di perangkat ini". Apakah
+permintaan itu berakhir di fingerprint Windows Hello atau turun ke pilihan lain
+ditentukan oleh **OS**, bukan oleh situs. Bila OS tidak dapat memenuhi
+permintaan, dialog **Windows Security** menampilkan "Handphone atau tablet" dan
+"Security key" — persis gejala fingerprint tidak pernah muncul.
+
+1. **Windows Hello harus aktif**, minimal PIN: Settings → Accounts → Sign-in
+   options → Windows Hello PIN (dan Fingerprint bila perangkat punya sensor).
+   Tanpa Windows Hello, Windows tidak punya tempat menyimpan passkey
+   device-bound, sehingga hanya ponsel/security key yang ditawarkan.
+2. **Windows 11 24H2+**: Settings → Privacy & security → **Passkey access** →
+   izinkan browser yang dipakai (Chrome/Edge). Bila consent pernah ditolak,
+   pendaftaran passkey gagal untuk aplikasi tersebut.
+3. **Penyedia passkey Windows** — penyebab tersering gejala "hanya ditawari
+   ponsel dan security key": Settings → Accounts → Passkeys → **Advanced
+   options** → pastikan **"Simpan passkey ke perangkat Windows ini"** aktif.
+   Toggle itu hanya muncul bila ada penyedia passkey pihak ketiga terpasang
+   (1Password, Bitwarden, Microsoft/Google Password Manager). Bila mati,
+   Windows Security berhenti menawarkan Windows Hello untuk passkey, dan yang
+   tersisa hanya "ponsel/tablet" serta "security key" — walaupun login Windows
+   dengan Windows Hello sendiri tetap berjalan normal. Setara lewat registry:
+   `HKCU\Software\Microsoft\Passkeys` → `LocalToggleStatus` = 1 (0 = mati).
+   Windows juga mengingat penyedia yang terakhir dipakai, jadi pernah memilih
+   penyedia lain dapat membuatnya jadi default.
+4. Pastikan Chrome/Edge cukup baru (field `hints` butuh versi 129+).
+5. **Uji pemisah** (memastikan masalahnya di OS, bukan di aplikasi): buka
+   `https://webauthn.io` di browser yang sama dan coba daftarkan credential.
+   Bila opsi "Simpan passkey ke perangkat Windows ini" juga tidak muncul di
+   sana, penyebabnya ada di Windows — kerjakan langkah 1-3 di atas.
+
+Cek cepat dari sisi aplikasi: buka `https://login.heloklin.com/` dan lihat baris
+**Platform authenticator (Windows Hello)**. Bila tertulis `TIDAK TERDETEKSI`,
+OS di perangkat itu tidak dapat menyediakan Windows Hello — perbaiki langkah 1-2.
+
+Batasan yang tidak bisa dipaksakan aplikasi:
+
+- WebAuthn tidak menyediakan cara memilih **fingerprint** secara spesifik.
+  Windows Hello yang menentukan apakah dialog meminta sidik jari, wajah, atau
+  PIN; aplikasi hanya bisa meminta authenticator platform di perangkat ini.
+- `hints: ['client-device']` (lihat `config/passkeys.php`) bersifat SARAN, dan
+  Chrome mengabaikannya bila `authenticatorAttachment` diisi. Di Windows dialog
+  passkey dimiliki OS, jadi pemilih "ponsel/security key" masih dapat muncul
+  pada sebagian kombinasi versi Windows dan browser.
+- Kebijakan yang dipasang server: `authenticatorAttachment: platform` (hanya
+  authenticator bawaan perangkat diterima) + `hints: client-device`. Lihat
+  `app/Passkeys/`.
 
 ## 5. Urutan deploy
 
@@ -199,7 +248,7 @@ deploy/verify.sh https://login.heloklin.com
 
 Hasil yang diharapkan: `/up` 200, `/login` 200, tamu yang membuka `/dashboard`
 dialihkan ke `/login`, `/bootstrap` 404 (instalasi sudah punya user),
-`/supervisor-test` sebagai `test-admin` menghasilkan 403, `GET /user/passkeys/options`
+`/supervisor-test` sebagai `admin` menghasilkan 403, `GET /user/passkeys/options`
 dengan `Accept: application/json` menghasilkan 423 (`passkey.confirm`), dan
 `http://` dialihkan 301 ke `https://`. Bila `AUTH_ENABLE_PASSWORD_LOGIN=true`,
 skrip juga menguji login password asli (CSRF + cookie jar) dan halaman
@@ -244,6 +293,8 @@ perangkat Windows nyata; jangan pernah menandainya PASS tanpa eksekusi.
 - `laravel/passkeys` masih `0.x`; ikat versi dan uji saat upgrade.
 - Attestation hanya `"none"` (tanpa verifikasi rantai sertifikat perangkat keras) — normal untuk passkey konsumen.
 - Passkey yang tersinkron ke akun Microsoft karyawan (bukan device-bound) melemahkan model keamanan; konfigurasikan Windows Hello sebagai device-bound.
+- Kebijakan authenticator diatur aplikasi, bukan paket: `App\Passkeys\WindowsHelloRegistrationOptions` dan `WindowsHelloVerificationOptions` menggantikan action `laravel/passkeys` di container (lihat `AppServiceProvider`). Setel `PASSKEYS_AUTHENTICATOR_ATTACHMENT` / `PASSKEYS_HINTS` di `.env` bila kebijakan perlu dilonggarkan — mis. admin harus mendaftar dari security key USB. Prasyarat sisi klien ada di §4c.
+- `hints` hanya dihormati bila browser cukup baru, dan di Windows dialog passkey dimiliki OS: pilihan "ponsel/security key" tidak dapat dihilangkan sepenuhnya dari sisi aplikasi.
 - Redis tidak dipakai; session/cache memakai database.
 - `docker-compose.yml` dan `Caddyfile` hanya untuk PoC lokal, tidak dipakai dan tidak boleh dijalankan di server ini (docker tidak terpasang).
 

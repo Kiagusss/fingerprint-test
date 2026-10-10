@@ -68,6 +68,47 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Authenticator yang Diizinkan
+    |--------------------------------------------------------------------------
+    |
+    | Ditambahkan oleh aplikasi ini; tidak dibaca paket secara langsung, melainkan
+    | oleh App\Passkeys\WindowsHelloRegistrationOptions yang menggantikan action
+    | GenerateRegistrationOptions di container.
+    |
+    |   platform       -> hanya authenticator bawaan perangkat (Windows Hello,
+    |                     Touch ID). Ini kebijakan aplikasi: setiap karyawan
+    |                     memakai perangkat kerjanya sendiri.
+    |   cross-platform -> hanya security key eksternal (YubiKey).
+    |   no-preference  -> default paket: apa pun, termasuk ponsel lewat QR dan
+    |                     passkey yang disinkronkan ke akun Microsoft/Google.
+    |
+    */
+
+    'authenticator_attachment' => env('PASSKEYS_AUTHENTICATOR_ATTACHMENT', 'platform'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | WebAuthn Hints (UI)
+    |--------------------------------------------------------------------------
+    |
+    | Juga ditambahkan aplikasi ini, dibaca oleh action pengganti di App\Passkeys.
+    | `hints` mengarahkan UI browser, bukan membatasi authenticator (itu tugas
+    | authenticator_attachment di atas). Daftar dipisah koma, urut prioritas:
+    |
+    |   client-device -> authenticator di perangkat ini: Windows Hello, Touch ID.
+    |   security-key  -> security key eksternal (YubiKey).
+    |   hybrid        -> ponsel lewat QR / Bluetooth (lintas perangkat).
+    |
+    | Kosongkan untuk kembali ke perilaku default browser. Perlu diketahui:
+    | Chrome mengabaikan hints bila authenticatorAttachment diisi, dan di Windows
+    | dialog passkey dimiliki OS sehingga hints mungkin tidak berpengaruh.
+    |
+    */
+
+    'hints' => env('PASSKEYS_HINTS', 'client-device'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Passkeys Routes Middleware
     |--------------------------------------------------------------------------
     |

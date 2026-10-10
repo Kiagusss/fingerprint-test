@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AuthenticateBiometricDevice;
 use App\Http\Middleware\EnsurePasskeyConfirmed;
 use App\Http\Middleware\EnsureRole;
 use App\Http\Middleware\SecurityHeaders;
@@ -14,6 +15,7 @@ use Webauthn\Exception\WebauthnException;
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
+        api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
@@ -35,6 +37,8 @@ return Application::configure(basePath: dirname(__DIR__))
             // Menggantikan password.confirm: akun passwordless membuktikan
             // kepemilikan passkey lewat ceremony, bukan lewat password.
             'passkey.confirm' => EnsurePasskeyConfirmed::class,
+            // Agen pemindai sidik jari di PC bersama (HMAC per perangkat).
+            'biometric.device' => AuthenticateBiometricDevice::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -11,7 +11,7 @@
         </div>
         <div class="card-body">
             <p class="text-sm text-ink-600">
-                Aplikasi ini belum memiliki akun sama sekali. Daftarkan admin pertama dengan sidik jari —
+                Aplikasi ini belum memiliki akun sama sekali. Daftarkan admin pertama dengan Windows Hello —
                 tanpa password. Halaman ini menutup diri sendiri begitu admin pertama berhasil didaftarkan.
             </p>
 
@@ -35,7 +35,7 @@
 
             <div class="mt-6 space-y-2 rounded-md border border-ink-200 bg-ink-50 p-3 text-xs text-ink-500">
                 <p><strong class="text-ink-600">Prasyarat:</strong> origin harus https (secure context) agar Windows Hello dapat berjalan.</p>
-                <p><strong class="text-ink-600">Setelah ini:</strong> admin mendaftarkan sidik jari setiap karyawan dari halaman Karyawan. Tidak ada password yang dibuat pada langkah mana pun.</p>
+                <p><strong class="text-ink-600">Setelah ini:</strong> admin mendaftarkan Windows Hello setiap karyawan dari halaman Karyawan. Tidak ada password yang dibuat pada langkah mana pun.</p>
                 <p><strong class="text-ink-600">Keamanan:</strong> bila aplikasi tidak berada di environment <code class="mono-val">local</code>, rute ini mensyaratkan <code class="mono-val">?key=</code> yang cocok dengan <code class="mono-val">BOOTSTRAP_KEY</code>.</p>
             </div>
         </div>
