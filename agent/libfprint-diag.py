@@ -248,7 +248,9 @@ def main() -> int:
     pgrep = shutil.which("pgrep")
 
     if pgrep:
-        holders = subprocess.run([pgrep, "-a", "-f", "fprintd"], capture_output=True, text=True).stdout.strip()
+        # -x: cocokkan nama prosesnya saja, supaya perintah lain yang kebetulan
+        # memuat kata "fprintd" di argumennya tidak ikut terhitung.
+        holders = subprocess.run([pgrep, "-a", "-x", "fprintd"], capture_output=True, text=True).stdout.strip()
         print(f"  proses fprintd: {holders if holders else 'tidak ada'}")
 
         if holders:
