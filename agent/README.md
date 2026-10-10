@@ -120,6 +120,23 @@ Kalau tetap ditolak dan Anda bekerja lewat SSH, pakai grup sebagai gantinya:
     sudo udevadm control --reload-rules
     sudo udevadm trigger --subsystem-match=usb
 
+### Kalau gejalanya berubah jadi "Segmentation fault"
+
+Setelah akses USB diberikan, keluhannya bisa berubah dari `Access denied` menjadi
+`Segmentation fault`: proses mati begitu pemindai dibuka. Itu jatuh di dalam
+libfprint/driver, bukan di logika agen, jadi yang perlu diketahui adalah panggilan
+mana yang rusak. Ada alat diagnosis untuk itu:
+
+    python3 libfprint-diag.py                 # tanpa menyentuh jari
+    python3 libfprint-diag.py --with-enroll   # ikut mencoba mendaftarkan jari
+
+Ia menjalankan setiap langkah di PROSES TERPISAH (daftar perangkat, `open_sync`,
+`open` lewat jalur async, `list_prints_sync`), melaporkan mana yang OK dan mana
+yang CRASH beserta kode sinyalnya, memeriksa apakah ada proses fprintd yang
+menggantung memegang perangkat, lalu menutup dengan kesimpulan. Kirim seluruh
+keluarannya — dari situ terlihat apakah cukup mengganti jalur agen ke async atau
+masalahnya ada di driver.
+
 ## 5. Batas yang harus Anda tahu
 
 **Identifikasi 1:N sudah ada — lewat `--capture libfprint`, bukan lewat fprintd.**
