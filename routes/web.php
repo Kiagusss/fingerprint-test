@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Auth\FingerprintLoginController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\BiometricDeviceManagementController;
 use App\Http\Controllers\BootstrapController;
@@ -59,6 +60,26 @@ Route::middleware('guest:web')->group(function () {
         ->middleware('throttle:6,1')
         ->name('login.store');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Masuk dengan sidik jari (tiket sekali pakai dari agen)
+|--------------------------------------------------------------------------
+| Agen di PC bersama mencocokkan jari (1:N), meminta tiket lewat endpoint
+| bertanda tangan perangkat, lalu membukakan alamat ini di browser PC yang
+| sama. Tiket berlaku 60 detik dan hanya bisa dipakai sekali.
+|
+| Sengaja TIDAK di dalam grup guest: di PC bersama, orang berikutnya yang
+| menempelkan jari memang harus menggantikan sesi yang sedang terbuka — sama
+| seperti mengunci layar lalu masuk sebagai orang lain.
+|
+| Ini satu-satunya jalur di aplikasi ini di mana sidik jari membuat sesi.
+| Batasnya dijelaskan di docs/BIOMETRIC.md §2.
+*/
+
+Route::get('/fingerprint/login/{token}', [FingerprintLoginController::class, 'consume'])
+    ->middleware('throttle:20,1')
+    ->name('fingerprint.login');
 
 /*
 |--------------------------------------------------------------------------

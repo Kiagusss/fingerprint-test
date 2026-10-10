@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Models\BiometricDevice;
 use App\Models\BiometricEnrollment;
+use App\Models\BiometricLoginTicket;
 use App\Models\User;
 use App\Services\TestLogger;
 use Illuminate\Http\JsonResponse;
@@ -17,10 +18,19 @@ use Illuminate\Validation\ValidationException;
  * Endpoint untuk agen pemindai sidik jari (bukan browser).
  *
  * Empat operasi untuk agen: heartbeat, daftar pendaftaran, lapor pendaftaran, dan
- * lapor hasil pencocokan. Tidak ada satu pun jalur di sini yang membuat sesi
- * login: identifikasi sidik jari dipakai untuk memilih akun, sedangkan pembuktian
- * identitas tetap password/passkey milik karyawan itu. Itu sebabnya controller
- * ini tidak menyentuh Auth.
+ * lapor hasil pencocokan — plus satu yang menerbitkan tiket login.
+ *
+ * Sejak 11 Okt 2026 pemilik aplikasi memilih sidik jari sebagai AUTENTIKASI
+ * (satu langkah, seperti Windows Hello), jadi `storeLoginTicket()` memang
+ * berujung pada sesi login. Itu keputusan sadar, dan konsekuensinya tertulis di
+ * docs/BIOMETRIC.md §2 — yang paling penting: kepercayaan ikut berpindah ke agen
+ * dan ke PC itu. Perangkat yang dikuasai orang lain bisa memalsukan identifikasi
+ * dan meminta tiket untuk siapa pun.
+ *
+ * Yang tetap dijaga: agen tidak pernah bisa mengarang identitas. Tiket hanya
+ * terbit bila `template_ref` menunjuk pendaftaran AKTIF milik user itu, dan
+ * sesinya baru dibuat setelah browser menukar tiket sekali pakai berumur 60
+ * detik. Itu sebabnya controller ini tidak menyentuh Auth.
  *
  * Kepercayaan pada agen dibatasi: `secret` perangkat membuktikan "request ini
  * datang dari agen terdaftar", bukan bahwa agen jujur. Agen yang nakal hanya
@@ -252,6 +262,77 @@ class BiometricDeviceController
                 'finger' => $enrollment?->finger,
                 'template_ref' => $enrollment?->template_ref,
                 'logged_at' => now()->toIso8601String(),
+            ],
+        ], 201);
+    }
+
+    /**
+     * Terbitkan tiket login sekali pakai untuk satu jari yang baru cocok.
+     *
+     * INI satu-satunya jalur agen yang berujung pada sesi login. Jarinya tetap
+     * bukan bukti identitas: agen yang mengaku "ini Budi" hanya dipercaya bila
+     * `template_ref` benar-benar menunjuk pendaftaran AKTIF milik Budi. Izinnya
+     * datang dari perangkat terdaftar, bukan dari isi klaimnya.
+     *
+     * Tiket yang dikembalikan berumur 60 detik, sekali pakai, dan hanya hash-nya
+     * yang tersimpan. Agen membukakan URL-nya di browser PC yang sama; di
+     * halaman itulah sesi dibuat (Auth\FingerprintLoginController).
+     */
+    public function storeLoginTicket(Request $request): JsonResponse
+    {
+        $device = $this->device($request);
+
+        $data = $request->validate([
+            'template_ref' => ['required', 'string', 'max:191'],
+            'quality' => ['nullable', 'integer', 'between:0,100'],
+        ]);
+
+        $enrollment = BiometricEnrollment::query()
+            ->active()
+            ->with('user')
+            ->where('template_ref', $data['template_ref'])
+            ->first();
+
+        if (! $enrollment instanceof BiometricEnrollment || ! $enrollment->user instanceof User) {
+            throw ValidationException::withMessages([
+                'template_ref' => 'Tidak ada pendaftaran aktif dengan template_ref itu.',
+            ]);
+        }
+
+        [$ticket, $token] = BiometricLoginTicket::issue(
+            $enrollment->user,
+            $device,
+            $enrollment->template_ref,
+            $enrollment->finger,
+        );
+
+        $this->logger->log('biometric_identified', [
+            'request' => $request,
+            'user' => $enrollment->user,
+            'auth_method' => 'fingerprint',
+            'role' => $enrollment->user->role?->value,
+            'credential_id' => $enrollment->template_ref,
+            'meta' => [
+                'device_uuid' => $device->uuid,
+                'device_name' => $device->name,
+                'matched' => true,
+                'finger' => $enrollment->finger,
+                'quality' => $data['quality'] ?? 0,
+                'enrollment_id' => $enrollment->getKey(),
+                // false = jari itu didaftarkan di PC lain; layak diperhatikan.
+                'is_local' => $enrollment->source_device_id === $device->id,
+                'login_ticket_id' => $ticket->getKey(),
+            ],
+        ]);
+
+        return response()->json([
+            'login' => [
+                'url' => route('fingerprint.login', ['token' => $token]),
+                'username' => $enrollment->user->username,
+                'display_name' => $enrollment->user->name,
+                'finger' => $enrollment->finger,
+                'expires_in' => BiometricLoginTicket::TTL_SECONDS,
+                'expires_at' => $ticket->expires_at?->toIso8601String(),
             ],
         ], 201);
     }

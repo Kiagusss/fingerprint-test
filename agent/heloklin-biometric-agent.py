@@ -37,6 +37,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import webbrowser
 
 DEFAULT_BASE_URL = "https://login.heloklin.com"
 DEFAULT_CONFIG = os.path.expanduser("~/.config/heloklin-biometric/device.env")
@@ -469,15 +470,15 @@ def capture_libfprint(finger: str, username: str, device_uuid: str) -> str:
 # --------------------------------------------------------------------------- perintah
 
 
-def cmd_identify(config: dict, args: argparse.Namespace) -> int:
-    """Cocokkan satu jari dengan SEMUA template lokal (1:N) lalu laporkan hasilnya.
+def identify_local_template(FPrint, config: dict) -> tuple[dict | None, int]:
+    """Cocokkan satu jari dengan SEMUA template lokal (1:N).
 
-    Perangkat yang harus tahu siapa pemilik jari itu; server hanya menerima
-    laporan dan menentukan nama akunnya dari catatan pendaftaran yang ia miliki.
-    Tidak ada sesi login yang dibuat di mana pun.
+    Mengembalikan (baris index yang cocok atau None, jumlah template yang dibaca).
+    Jari yang tidak dikenal bukan kesalahan: None adalah jawaban yang sah.
+
+    Dipakai bersama oleh `identify` (mencatat saja) dan `login` (membuat tiket
+    masuk), supaya keduanya benar-benar melakukan pencocokan yang sama.
     """
-    FPrint = libfprint_module()
-
     index = load_print_index()
 
     if not index:
@@ -491,16 +492,16 @@ def cmd_identify(config: dict, args: argparse.Namespace) -> int:
 
     loaded = []
 
-    for row in index:
-        path = os.path.join(PRINT_STORE, str(row.get("file")))
+    for entry in index:
+        path = os.path.join(PRINT_STORE, str(entry.get("file")))
 
         try:
             with open(path, "rb") as handle:
                 blob = handle.read()
 
-            loaded.append((row, FPrint.Print.deserialize(list(blob)), blob))
+            loaded.append((entry, FPrint.Print.deserialize(list(blob)), blob))
         except Exception as error:  # noqa: BLE001
-            print(f"   lewati {row.get('file')}: {error}", file=sys.stderr)
+            print(f"   lewati {entry.get('file')}: {error}", file=sys.stderr)
 
     if not loaded:
         raise AgentError("Tidak ada template yang bisa dimuat dari penyimpanan lokal.")
@@ -535,15 +536,28 @@ def cmd_identify(config: dict, args: argparse.Namespace) -> int:
     if match is None and seen:
         match = seen[-1]
 
-    row = None
+    if match is None:
+        return None, len(loaded)
 
-    if match is not None:
-        matched_bytes = print_bytes(match)
+    matched_bytes = print_bytes(match)
 
-        for entry, candidate, blob in loaded:
-            if matched_bytes == blob or prints_equal(FPrint, match, candidate):
-                row = entry
-                break
+    for entry, candidate, blob in loaded:
+        if matched_bytes == blob or prints_equal(FPrint, match, candidate):
+            return entry, len(loaded)
+
+    return None, len(loaded)
+
+
+def cmd_identify(config: dict, args: argparse.Namespace) -> int:
+    """Cocokkan satu jari dengan SEMUA template lokal, lalu catat hasilnya.
+
+    Perangkat yang tahu siapa pemilik jari itu; server hanya menerima laporan dan
+    menentukan nama akunnya dari catatan pendaftaran yang ia miliki. Perintah ini
+    TIDAK membuka sesi — untuk itu ada `login`.
+    """
+    FPrint = libfprint_module()
+
+    row, _ = identify_local_template(FPrint, config)
 
     # Nama akun ditentukan server dari catatan pendaftarannya sendiri.
     person = None
@@ -579,7 +593,67 @@ def cmd_identify(config: dict, args: argparse.Namespace) -> int:
     print(f"  dilaporkan   : {report_body.get('identification', {}).get('logged_at', '-')}")
     print()
     print("Riwayatnya di https://login.heloklin.com/dashboard (tabel log di bagian bawah).")
-    print("Catatan: ini identifikasi, bukan autentikasi — masuk ke akun tetap butuh password.")
+    print("Catatan: perintah ini hanya mencatat. Untuk benar-benar MASUK, pakai `login`.")
+
+    return 0
+
+
+def cmd_login(config: dict, args: argparse.Namespace) -> int:
+    """Tempelkan jari -> tiket masuk sekali pakai -> browser dibukakan.
+
+    Ini yang membuat jari benar-benar bisa dipakai untuk MASUK: server
+    menerbitkan tiket berumur 60 detik yang hanya bisa dipakai sekali, dan
+    browser di PC yang sama menukarnya menjadi sesi. Tidak ada password yang
+    diketik, karena pemilik aplikasi memilih alur satu langkah.
+
+    Batas yang perlu diingat: siapa pun yang bisa menjalankan perintah ini di PC
+    itu bisa masuk sebagai siapa pun yang jarinya terdaftar di sana.
+    """
+    FPrint = libfprint_module()
+
+    row, _ = identify_local_template(FPrint, config)
+
+    if row is None:
+        print("Tidak ada jari yang cocok dengan template mana pun di PC ini.")
+        print("Tidak ada tiket yang diterbitkan.")
+        return 1
+
+    status, body = signed_request(config, "POST", "/api/biometric/login-tickets", {
+        "template_ref": row.get("template_ref"),
+        "quality": 0,
+    })
+
+    if status != 201:
+        print(f"GAGAL meminta tiket masuk (HTTP {status}): {json.dumps(body, ensure_ascii=False)}", file=sys.stderr)
+
+        if status == 422:
+            print("Pendaftaran jari itu sudah dicabut atau tidak dikenal server; daftarkan ulang.", file=sys.stderr)
+
+        return 1
+
+    login = body.get("login", {})
+    url = str(login.get("url", ""))
+
+    print("Jari cocok — tiket masuk terbit.")
+    print(f"  username : {login.get('username')}")
+    print(f"  jari     : {login.get('finger')}")
+    print(f"  berlaku  : {login.get('expires_in')} detik, sekali pakai")
+    print()
+    print("  Buka alamat ini di browser PC ini untuk masuk:")
+    print(f"  {url}")
+
+    if args.no_open:
+        return 0
+
+    print()
+
+    try:
+        opened = webbrowser.open(url)
+    except Exception as error:  # noqa: BLE001 - tanpa browser pun URL-nya tetap berguna
+        print(f"  Tidak bisa membuka browser otomatis ({error}); salin alamat di atas.")
+        return 0
+
+    print("  Browser dibuka otomatis." if opened else "  Tidak ada browser yang bisa dibuka; salin alamat di atas.")
 
     return 0
 
@@ -868,6 +942,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="cocokkan satu jari dengan semua template lokal (1:N) lalu laporkan ke server",
     )
 
+    login = sub.add_parser(
+        "login",
+        parents=[parent],
+        help="tempelkan jari lalu MASUK: terbitkan tiket sekali pakai dan bukakan browsernya",
+    )
+    login.add_argument(
+        "--no-open",
+        action="store_true",
+        help="jangan buka browser; cukup cetak alamat tiketnya",
+    )
+
     return parser
 
 
@@ -918,6 +1003,9 @@ def main() -> int:
 
         if args.command == "identify":
             return cmd_identify(config, args)
+
+        if args.command == "login":
+            return cmd_login(config, args)
 
         return cmd_enroll(config, args)
     except AgentError as error:

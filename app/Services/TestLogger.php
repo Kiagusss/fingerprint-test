@@ -43,6 +43,8 @@ class TestLogger
         'biometric_enrolled',
         'biometric_identified',
         'biometric_enrollment_revoked',
+        'fingerprint_login_success',
+        'fingerprint_login_failed',
     ];
 
     public function log(string $event, array $context = []): TestLog

@@ -58,6 +58,7 @@ Cek dulu apakah sistem Anda sudah mengenali sensornya:
     python3 heloklin-biometric-agent.py check
     python3 heloklin-biometric-agent.py enroll --username budi --finger right-index-finger --capture libfprint
     python3 heloklin-biometric-agent.py identify
+    python3 heloklin-biometric-agent.py login
 
 - `doctor` melaporkan OS, apakah pemindai terlihat, apakah jalur pembacaan jari
   tersedia, dan apakah server menerima kredensial perangkat.
@@ -68,9 +69,12 @@ Cek dulu apakah sistem Anda sudah mengenali sensornya:
 - `enroll` membaca jari lalu melaporkan pendaftarannya. Perintah ini akan
   meminta jari pada perangkat — inilah tahap prompt yang Anda tunggu.
 - `identify` mencocokkan satu jari dengan SEMUA template di penyimpanan lokal
-  (1:N), lalu melaporkan hasilnya ke server. Ini langkah "tempel jari, sistem
-  tahu siapa". Ia tidak membuat sesi login: masuk ke akun tetap butuh
-  password/passkey.
+  (1:N), lalu melaporkan hasilnya ke server. Ia hanya MENCATAT; ia tidak membuka
+  sesi.
+- `login` melakukan pencocokan yang sama, lalu meminta tiket masuk sekali pakai
+  (60 detik) dan membukakan alamatnya di browser PC itu. Inilah perintah yang
+  membuat jari benar-benar dipakai untuk MASUK. Pakai `--no-open` bila Anda hanya
+  ingin mencetak alamatnya (mis. saat menguji lewat SSH).
 
 `enroll` menerima pilihan cara membaca jari:
 
@@ -125,10 +129,14 @@ orang tidak bisa dicocokkan ke orang lain. Agen `libfprint` menyimpan template
 di penyimpanannya sendiri, dan justru itu yang memungkinkan satu jari dicocokkan
 ke semua template sekaligus.
 
-**Identifikasi tetap bukan autentikasi.** `identify` hanya menjawab "ini siapa".
-Tidak ada sesi, token, maupun cookie yang dibuat — baik di agen maupun di
-endpoint `/api/biometric/identifications`. Yang membuktikan identitas tetap
-password/passkey milik karyawan itu di `/login`.
+**Login dengan jari itu SATU langkah, dan itu keputusan sadar.** Sejak 11 Okt 2026
+pemilik aplikasi memilih sidik jari sebagai autentikasi penuh, seperti Windows
+Hello — jadi perintah `login` memang membuka sesi, tanpa password. Konsekuensinya
+jujur saja: risikonya berpindah ke agen dan ke PC itu, karena siapa pun yang bisa
+menjalankan agen di PC tersebut dapat meminta tiket masuk untuk pengguna mana pun
+yang jarinya terdaftar di sana. Kunci fisik PC-nya, jangan biarkan orang lain
+memakai akun agen, dan perlakukan `secret` perangkat seperti kredensial admin.
+Rincian lengkapnya di `docs/BIOMETRIC.md` §2.
 
 **Template hanya ada di PC tempat pendaftaran dilakukan.** Penyimpanan agen
 bersifat lokal, jadi karyawan yang memakai dua PC harus didaftarkan di keduanya.

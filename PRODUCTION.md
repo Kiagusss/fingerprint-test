@@ -239,6 +239,47 @@ Batasan yang tidak bisa dipaksakan aplikasi:
   authenticator bawaan perangkat diterima) + `hints: client-device`. Lihat
   `app/Passkeys/`.
 
+### 4d. Masuk dengan sidik jari di PC bersama (satu langkah)
+
+Sejak 11 Okt 2026 sidik jari dipakai sebagai **autentikasi**, bukan lagi sekadar
+identifikasi. Alurnya, dan bagian mana yang dijalankan siapa:
+
+```
+agen di PC  : cocokkan jari (1:N)  ->  POST /api/biometric/login-tickets
+server      : terbitkan tiket sekali pakai, umur 60 detik (hash-nya saja disimpan)
+agen        : bukakan /fingerprint/login/<token> di browser PC itu
+browser     : tukar tiket jadi sesi  ->  /dashboard
+```
+
+Yang perlu diketahui operator:
+
+- Halaman penukaran tiket sengaja berada DI LUAR grup `guest`: di PC bersama,
+  orang berikutnya yang menempelkan jari memang harus menggantikan sesi yang
+  sedang terbuka.
+- Pemakaian ulang, tiket kedaluwarsa, atau token yang salah dijawab dengan
+  pengalihan ke `/login` dan satu baris `fingerprint_login_failed` di
+  `/dashboard`; keberhasilan tercatat sebagai `fingerprint_login_success`.
+- Password dan passkey TIDAK dihapus sebagai jalur masuk. Keduanya tetap ada
+  untuk admin atau saat sensornya bermasalah.
+- Risiko yang menyertai keputusan ini — terutama bahwa kepercayaan berpindah ke
+  PC/agen itu — tertulis di `docs/BIOMETRIC.md` §2. Baca sebelum menambah PC.
+
+Verifikasi sesudah deploy atau sesudah menyentuh jalur ini:
+
+```bash
+php artisan biometric:register-device "SMOKE TEST (uji asap)" --host=SMOKE \
+    --platform=linux --secret-out=/tmp/smoke.env
+python3 scripts/smoke_fingerprint_login.py --device-config=/tmp/smoke.env --username=admin
+php artisan tinker --execute="App\Models\BiometricEnrollment::where('template_ref','like','tpl-smoke-%')->delete();"
+php artisan tinker --execute="App\Models\BiometricDevice::where('name','SMOKE TEST (uji asap)')->delete();"
+rm -f /tmp/smoke.env
+```
+
+Skrip itu membuat perangkat dan pendaftaran SEMENTARA, membuktikan rantai
+`agen -> tiket -> sesi -> /dashboard` di server yang hidup, lalu meninggalkan
+sisa yang dihapus oleh dua perintah sesudahnya. Ia tidak pernah memakai
+`replace`, jadi jari asli pemilik akun tidak tersentuh.
+
 ## 5. Urutan deploy
 
 ```bash

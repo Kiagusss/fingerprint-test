@@ -39,4 +39,12 @@ Route::middleware('biometric.device')->prefix('biometric')->name('biometric.')->
     // membuat sesi, token, maupun cookie — lihat storeIdentification().
     Route::post('/identifications', [BiometricDeviceController::class, 'storeIdentification'])
         ->name('identifications.store');
+
+    // Terbitkan TIKET login sekali pakai untuk jari yang baru cocok. Agen
+    // membukakan alamat tiket itu di browser PC yang sama; di situlah sesi
+    // dibuat (lihat Auth\FingerprintLoginController). Ini satu-satunya jalur
+    // agen yang berujung pada sesi login, dan hanya pengguna yang jarinya
+    // benar-benar cocok dengan pendaftaran AKTIF yang bisa mendapat tiket.
+    Route::post('/login-tickets', [BiometricDeviceController::class, 'storeLoginTicket'])
+        ->name('login-tickets.store');
 });

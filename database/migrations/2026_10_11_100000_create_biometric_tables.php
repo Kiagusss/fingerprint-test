@@ -5,16 +5,20 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Lapisan identifikasi sidik jari (bukan autentikasi).
+ * Lapisan sidik jari: perangkat, pendaftaran jari, dan pencocokan di PC.
  *
  * Model keamanannya sengaja dipisah:
  *   - sidik jari menjawab "INI SIAPA" (identifikasi, 1:N) supaya karyawan tidak
  *     perlu mengetik username di PC bersama;
- *   - pembuktian identitas TETAP password/passkey milik karyawan itu sendiri.
+ *   - dan pada awalnya pembuktian identitas TETAP password/passkey milik
+ *     karyawan itu sendiri.
  *
- * Karena itu tidak ada kolom kunci privat di sini: server tidak pernah
- * mempercayai lapisan ini sebagai bukti identitas, sehingga tidak perlu ada
- * rahasia yang bisa dipakai untuk memalsukan login. Lihat docs/BIOMETRIC.md.
+ * CATATAN PERUBAHAN (11 Okt 2026): pemilik aplikasi memilih sidik jari sebagai
+ * autentikasi penuh, jadi sekarang ada jalur di mana jari saja cukup untuk masuk
+ * — lewat tiket sekali pakai (tabel `biometric_login_tickets`). Karena itu tidak
+ * ada kolom kunci privat di sini: yang dijaga bukan lagi "tidak pernah membuat
+ * sesi", melainkan "agen tidak bisa mengarang identitas". Batas barunya, termasuk
+ * risiko yang berpindah ke agen dan ke PC, tertulis di docs/BIOMETRIC.md §2.
  */
 return new class extends Migration
 {

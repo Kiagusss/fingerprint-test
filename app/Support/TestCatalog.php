@@ -241,10 +241,26 @@ class TestCatalog
             [
                 'key' => 'biometric_never_authenticates',
                 'category' => 'biometric',
-                'title' => 'Sidik jari tidak pernah cukup untuk masuk',
+                'title' => 'Endpoint agen tidak membuat sesi; sesi hanya lahir dari tiket sekali pakai',
                 'source' => 'auto',
-                'expected' => 'Seluruh endpoint agen tidak membuat sesi login; identifikasi hanya memilih akun, password/passkey tetap membuktikan identitas.',
+                'expected' => 'Tidak ada endpoint agen (heartbeat, pendaftaran, pencocokan) yang membuat sesi login. Sesi hanya dibuat ketika browser menukar tiket 60 detik sekali pakai di /fingerprint/login/{token}, dan hanya bila template_ref menunjuk pendaftaran yang masih aktif.',
                 'automated_test' => 'Tests\\Feature\\BiometricEnrollmentTest::test_the_biometric_layer_never_creates_a_session',
+            ],
+            [
+                'key' => 'fingerprint_login_ticket_single_use',
+                'category' => 'biometric',
+                'title' => 'Tiket masuk dari sidik jari sekali pakai dan berumur pendek',
+                'source' => 'auto',
+                'expected' => 'Tiket hanya bisa ditukar sekali, kedaluwarsa setelah 60 detik, dan yang tersimpan hanya sha256 tokennya — bukan token mentahnya.',
+                'automated_test' => 'Tests\\Feature\\FingerprintLoginTest::test_a_ticket_can_only_be_used_once',
+            ],
+            [
+                'key' => 'fingerprint_login_needs_active_enrollment',
+                'category' => 'biometric',
+                'title' => 'Tiket masuk hanya untuk jari yang pendaftarannya masih aktif',
+                'source' => 'auto',
+                'expected' => 'Permintaan tiket dengan template_ref yang tidak dikenal, atau yang pendaftarannya sudah dicabut, dijawab 422 dan tidak menghasilkan tiket.',
+                'automated_test' => 'Tests\\Feature\\FingerprintLoginTest::test_a_ticket_cannot_be_issued_for_an_unknown_or_revoked_enrollment',
             ],
             [
                 'key' => 'biometric_template_encrypted',

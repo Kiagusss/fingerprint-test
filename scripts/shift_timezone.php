@@ -23,14 +23,14 @@ declare(strict_types=1);
  * Setelah itu: `php artisan optimize` sebagai user web, lalu muat ulang
  * PHP-FPM. Rinciannya di PRODUCTION.md §3 "Zona waktu".
  */
-
 $root = dirname(__DIR__);
 
 require $root.'/vendor/autoload.php';
 
 $app = require $root.'/bootstrap/app.php';
-$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$app->make(Kernel::class)->bootstrap();
 
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
 
 $apply = in_array('--apply', $argv, true);

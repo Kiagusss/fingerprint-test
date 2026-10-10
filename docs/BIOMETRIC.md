@@ -23,33 +23,55 @@ menyimpan hasil pendaftaran.
 
 ## 2. Model keamanan (baca ini dulu)
 
-Lapisan ini **hanya mengidentifikasi**; ia tidak membuktikan identitas.
+**Sejak 11 Okt 2026 sidik jari dipakai sebagai AUTENTIKASI, bukan lagi hanya
+identifikasi.** Pemilik aplikasi memilih alur satu langkah supaya karyawan bisa
+masuk ke PC bersama dengan sekali sentuh, seperti Windows Hello. Sebelumnya
+lapisan ini sengaja tidak pernah cukup untuk masuk; batas itu kini berubah, dan
+konsekuensinya harus disadari, bukan disembunyikan.
 
 ```
-sidik jari  ->  "jari ini milik user X"   (diselesaikan agen, di PC)
-password/passkey milik X                 ->  membuktikan "saya benar X"
+sidik jari (1:N di PC)  ->  tiket sekali pakai (60 detik)  ->  browser menukarnya  ->  sesi
 ```
 
-Konsekuensinya, dan ini disengaja:
+Yang tetap DIJAGA:
 
-- Tidak ada endpoint di lapisan ini yang membuat sesi login. Setelah identifikasi
-  berhasil, aplikasi tetap meminta password/passkey milik akun tersebut.
-  (`BiometricEnrollmentTest::test_the_biometric_layer_never_creates_a_session`)
-- Server tidak menyimpan kunci privat apa pun untuk lapisan ini, karena tidak ada
-  yang perlu ditandatangani oleh agen. `secret` perangkat adalah rahasia bersama
-  untuk membuktikan "request ini dari agen terdaftar", bukan untuk membuat sesi.
-- Agen yang dirusak hanya bisa memalsukan **klaim username** — setara dengan
-  seseorang mengetikkan username milik orang lain di form login. Ia tidak
-  mendapatkan password orang itu.
-- Karena itu agen TIDAK perlu menjadi benteng yang tahan terhadap karyawan yang
-  memegang hak admin di PC itu. Yang tidak boleh dilakukan tetap tidak boleh:
-  jangan biarkan sidik jari saja menghasilkan sesi login.
+- Agen tidak bisa mengarang identitas. Tiket hanya terbit bila `template_ref`
+  menunjuk pendaftaran yang masih AKTIF, dan nama akun ditentukan server dari
+  catatannya sendiri — bukan dari klaim agen.
+  (`FingerprintLoginTest::test_a_ticket_cannot_be_issued_for_an_unknown_or_revoked_enrollment`)
+- Tiket berumur 60 detik dan sekali pakai, dan yang tersimpan hanya sha256
+  tokennya, bukan token mentahnya.
+  (`FingerprintLoginTest::test_a_ticket_can_only_be_used_once`, `...test_the_raw_token_is_never_stored`)
+- Endpoint agen sendiri tetap tidak membuat sesi; sesi hanya lahir di halaman
+  penukaran tiket, dan setiap penukaran tercatat sebagai
+  `fingerprint_login_success` atau `fingerprint_login_failed` di `/dashboard`.
+- Password dan passkey TIDAK dihapus. Keduanya masih bisa dipakai, termasuk oleh
+  admin yang tidak mau bergantung pada sensor.
 
-Kalau suatu saat sidik jari harus menjadi bukti identitas untuk kontrol akses,
-hentikan dan rancang ulang: dengan PC yang semua karyawannya admin, pembuktian
-harus dipegang sesuatu yang tidak dikuasai pengguna PC (mis. security key FIDO2
-ber-sensor sidik jari per karyawan). Jangan menaikkan kepercayaan pada lapisan
-ini tanpa itu.
+Yang harus DISADARI (risiko yang diterima dengan keputusan itu):
+
+- **Kepercayaan berpindah ke agen dan ke PC itu.** Siapa pun yang bisa
+  menjalankan agen di PC tersebut dapat meminta tiket untuk pengguna mana pun
+  yang jarinya terdaftar di sana, tanpa menyentuh jari sama sekali. Sebelumnya
+  kemampuan itu hanya berarti "membuat pendaftaran palsu" — tidak berguna untuk
+  masuk. Karena itu: kunci fisik PC-nya, jangan biarkan orang lain memakai akun
+  agen, dan perlakukan `secret` perangkat seperti kredensial admin.
+- **Belum ada deteksi liveness.** Cetakan atau bekas jari yang tertinggal bisa
+  menipu sensor sekecil CS9711.
+- **Mutu matcher 1:N belum diukur.** Dengan sensor kecil dan template 15 sentuhan,
+  salah cocok dan gagal cocok sama-sama mungkin; sampai FAR/FRR diukur, batasi
+  jumlah karyawan terdaftar per PC dan pantau `biometric_identified` di
+  `/dashboard`.
+- **Tiket adalah kredensial bearer.** Kalau alamatnya terlihat orang lain dalam
+  60 detik itu, orang tersebut bisa masuk sebagai karyawan itu. Umur pendek dan
+  sekali pakai membatasi, bukan menghapus, risiko ini.
+
+Kalau suatu saat risiko itu dianggap terlalu besar, cara kembali ke dua langkah
+sudah tersedia tanpa membongkar apa pun: jangan terbitkan tiket (matikan route
+`login-tickets`), pakai `identify` saja untuk memilih akun, dan biarkan
+password/passkey kembali menjadi pembuktian identitas. Uji asapnya ada di
+`scripts/smoke_fingerprint_login.py` — jalankan sesudah setiap perubahan di jalur
+ini, karena ia membuktikan rantai lengkapnya di server yang hidup.
 
 ## 3. Endpoint
 
