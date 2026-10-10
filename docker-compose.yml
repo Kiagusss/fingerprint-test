@@ -1,0 +1,33 @@
+# Dedicated, disposable MySQL instance for the Windows Hello / passkey PoC.
+#
+# ISOLATION CONTRACT
+#   - Its own container, its own volume, its own credentials, port 3307.
+#   - It must never be pointed at, or share a volume with, the production DB.
+#   - Tear down with `docker compose down -v` (also removes the volume).
+#
+# The variables below are read from .env (DB_PASSWORD). Nothing here contains a
+# real secret.
+
+services:
+  hello-test-mysql:
+    image: mysql:8.4
+    container_name: hello-test-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-hello_test}
+      MYSQL_USER: ${DB_USERNAME:-hello_test}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD must be set in .env}
+    ports:
+      - "127.0.0.1:3307:3306"
+    volumes:
+      - hello-test-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p${DB_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  hello-test-mysql-data:
+    name: hello-test-mysql-data

@@ -1,0 +1,34 @@
+# Local HTTPS front-end for the PoC.
+#
+# TLS is terminated here and forwarded to `php artisan serve` on 127.0.0.1:8099.
+# Laravel trusts X-Forwarded-* (see bootstrap/app.php) so it generates https URLs
+# and sets the Secure session cookie.
+#
+# Run with:  caddy run --config Caddyfile
+# The certificate is issued by mkcert for hello-test.localhost (Chrome resolves
+# *.localhost without editing /etc/hosts) and trusted via the user NSS store.
+
+{
+	# Local certificate only, never touch ACME/Let's Encrypt.
+	auto_https off
+	admin off
+}
+
+https://hello-test.localhost:8443, https://localhost:8443 {
+	tls /home/kiagus/Documents/hello-test/.certs/hello-test.crt /home/kiagus/Documents/hello-test/.certs/hello-test.key
+
+	encode zstd gzip
+
+	reverse_proxy 127.0.0.1:8099 {
+		# {hostport} (bukan {host}) — sertakan port 8443 agar Laravel membangun
+		# URL absolut yang benar; {host} saja akan membuang port.
+		header_up X-Forwarded-Proto https
+		header_up X-Forwarded-Host {hostport}
+		header_up X-Forwarded-Port {port}
+	}
+
+	log {
+		output file /home/kiagus/Documents/hello-test/storage/logs/caddy-access.log
+		format console
+	}
+}
