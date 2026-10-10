@@ -33,3 +33,10 @@ Thumbs.db
 # Artefak Python dari agen pemindai sidik jari (bytecode, bukan sumber)
 __pycache__/
 *.pyc
+
+# Artefak dari direktori induk (/www/wwwroot/login.heloklin.com) — salinan repo
+# lama yang pernah ikut ter-push ke main: `.user.ini` dibuat oleh panel, dan
+# `fingerprint-test` adalah pointer ke repo ini sendiri. Keduanya tidak boleh
+# ada di dalam repo aplikasi.
+/.user.ini
+/fingerprint-test
